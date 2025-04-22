@@ -32,7 +32,7 @@ const AssetInventory = () => {
     }
   };
 
-  // Filter assets based on search term
+  // Filter assets based on search 
   const filteredAssets = assets.filter(asset => 
     asset.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     asset.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
