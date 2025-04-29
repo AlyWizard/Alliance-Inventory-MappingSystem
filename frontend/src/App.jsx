@@ -4,6 +4,7 @@ import Dashboard from './pages/Dashboard';
 import WorkstationInventory from './pages/WorkstationInventory';
 import Login from './pages/LoginPage';
 import EmployeesInventory from './pages/EmployeesInventory';
+import Assets from './pages/Assets';
 
 function App() {
   return (
@@ -14,6 +15,7 @@ function App() {
         <Route path="/asset-inventory" element={<AssetInventory />} />
         <Route path="/workstation-inventory" element={<WorkstationInventory />} />
         <Route path="/employees" element={<EmployeesInventory />} />
+        <Route path="/assets" element={<Assets />} />
       </Routes>
     </Router>
   );

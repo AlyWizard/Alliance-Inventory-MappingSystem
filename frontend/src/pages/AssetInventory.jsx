@@ -1,14 +1,31 @@
 import React, { useState } from 'react';
-import { FaSearch, FaSync, FaPlus, FaUserPlus, FaFileExport, FaTrash } from 'react-icons/fa';
-import escLogo from '../assets/ESCLogo.png';
+import { FaSearch, FaSync, FaPlus, FaUserPlus, FaFileExport, FaTrash,  } from 'react-icons/fa';
+// Replace with your actual logo file
+import allianceLogo from '../assets/allianceLogo.png'; 
+
 
 const AssetInventory = () => {
-  // Sample data for the table
+  // Sample data for the table - updated to match the image
   const [assets, setAssets] = useState([
-    { id: 1, name: 'Test Asset 1', username: 'testuser', department: 'Testing', assigned: 0, dateAdded: 'N/A' },
-    { id: 2, name: 'Test Asset 2', username: 'testuser', department: 'Testing', assigned: 0, dateAdded: 'N/A' },
-    { id: 3, name: 'Test Asset 3', username: 'testuser', department: 'Testing', assigned: 0, dateAdded: 'N/A' },
+    { id: 1, name: 'Microsoft 365', username: 'scayetano', department: 'IT', assigned: 6, dateAdded: 'Feb. 2, 2024' },
+    { id: 2, name: 'BENQ', username: 'scayetano', department: 'IT', assigned: 6, dateAdded: 'Feb. 2, 2024' },
+    { id: 3, name: 'Logitech', username: 'scayetano', department: 'IT', assigned: 6, dateAdded: 'Feb. 2, 2024' },
+    { id: 4, name: 'Edifier', username: 'scayetano', department: 'IT', assigned: 6, dateAdded: 'Feb. 2, 2024' },
+    { id: 5, name: 'KEBOS', username: 'scayetano', department: 'IT', assigned: 6, dateAdded: 'Feb. 2, 2024' },
+    { id: 6, name: 'Dell', username: 'scayetano', department: 'IT', assigned: 6, dateAdded: 'Feb. 2, 2024' },
+    { id: 7, name: 'Aerocool', username: 'scayetano', department: 'IT', assigned: 6, dateAdded: 'Feb. 2, 2024' },
+    { id: 8, name: 'Aerocool', username: 'scayetano', department: 'IT', assigned: 6, dateAdded: 'Feb. 2, 2024' },
+    { id: 9, name: 'Aerocool', username: 'scayetano', department: 'IT', assigned: 6, dateAdded: 'Feb. 2, 2024' },
   ]);
+
+  // Employee data - from the image
+  const employeeData = {
+    no: '021',
+    name: 'Alyssa Isuan',
+    username: 'AIsuan',
+    department: 'Alliance - IT',
+    company: 'Alliance'
+  };
 
   // State for selected items
   const [selectedItems, setSelectedItems] = useState([]);
@@ -40,44 +57,51 @@ const AssetInventory = () => {
   );
 
   return (
-    <div className="min-h-screen w-full flex bg-[#0f1a1f] text-white font-sans">
+    <div className="flex min-h-screen bg-[#0f1a1f] text-white font-sans">
       {/* Left Sidebar */}
-      <aside className="w-64 min-h-screen flex-shrink-0 bg-[#13232c] p-4 flex flex-col">
-        {/* Logo */}
-        <div className="flex items-center gap-2 mb-6">
-          {/* Logo Icon */}
-          <div className="bg-[#1e4975] w-12 h-12 rounded-md flex items-center justify-center shadow-inner">
-            <img src={escLogo} alt="ESC Logo" className="h-8 w-8" />
-          </div>
-
-          {/* Text beside logo */}
-          <div className="text-[#41b853] leading-tight">
-            <h1 className="text-2xl font-bold">Esc</h1>
-            <span className="text-xs tracking-widest text-[#41b853]">CORPORATION</span>
+      <aside className="w-64 bg-[#13232c]">
+        {/* Logo Section */}
+        <div className="p-4 mb-6">
+          <div className="flex items-center gap-3">
+            <div className="bg-[#1e4975] w-12 h-12 rounded-md flex items-center justify-center">
+              <div className="text-white font-bold text-lg">Esc</div>
+            </div>
+            <div>
+              <div className="text-[#41b853] text-3xl font-bold leading-none">Esc</div>
+              <div className="text-[#41b853] text-[10px] tracking-widest">CORPORATION</div>
+            </div>
           </div>
         </div>
 
-        {/* Floor Mapping Button */}
-        <div className="mb-8 border rounded-md" style={{ borderColor: '#273C45', backgroundColor: '#16282F' }}>
-          <button className="text-[#38b6ff] py-2 px-4 w-full text-left">
-            Floor Mapping
-          </button>
+        {/* Floor Mapping Container */}
+        <div className="px-4 mb-6">
+          <div className="rounded-md border border-[#273C45] overflow-hidden">
+            <button className="w-full py-3 px-4 bg-[#16282F] text-[#38b6ff] text-left">
+              Floor Mapping
+            </button>
+          </div>
         </div>
 
-        {/* Inventories Section */}
-        <h2 className="text-gray-400 mb-4 pl-4">Inventories</h2>
-        <div className="mb-6 border" style={{ borderColor: '#273C45', backgroundColor: '#16282F' }}>
-          <div className="space-y-3 pl-4 pr-4 pt-4">
-            <div className="flex items-center gap-3 hover:text-[#38b6ff] cursor-pointer">
+        {/* Inventories Header */}
+        <div className="px-4 mb-3 text-gray-400 font-medium">
+          Inventories
+        </div>
+
+        {/* Inventories Container */}
+        <div className="mx-4 bg-[#16282F] rounded-md mb-6 border border-[#273C45] overflow-hidden">
+          {/* Main Menu Items */}
+          <div className="p-2 space-y-1">
+            {/* Employees (Active) */}
+            <div className="bg-[#38b6ff] text-white rounded flex items-center gap-2 p-2">
               <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                <circle cx="9" cy="7" r="4"></circle>
-                <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
+                <path d="M17 2L12 7 7 2"></path>
               </svg>
               <span>Employees</span>
             </div>
-            <div className="flex items-center gap-3 hover:text-[#38b6ff] cursor-pointer">
+            
+            {/* Departments */}
+            <div className="text-white flex items-center gap-2 p-2 hover:bg-[#1a3a4a] rounded">
               <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
                 <circle cx="9" cy="7" r="4"></circle>
@@ -86,32 +110,40 @@ const AssetInventory = () => {
               </svg>
               <span>Departments</span>
             </div>
-            <div className="flex items-center gap-3 hover:text-[#38b6ff] cursor-pointer">
-              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
-                <polyline points="9 22 9 12 15 12 15 22"></polyline>
-              </svg>
-              <span>Companies</span>
-            </div>
-            <div className="flex items-center gap-3 hover:text-[#38b6ff] cursor-pointer">
+            
+            {/* Companies */}
+            <div className="text-white flex items-center gap-2 p-2 hover:bg-[#1a3a4a] rounded">
               <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
                 <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>
               </svg>
+              <span>Companies</span>
+            </div>
+          </div>
+
+          {/* Divider */}
+          <div className="h-px bg-[#273C45]"></div>
+
+          <div className="p-2 space-y-1">
+            {/* Manufacturers */}
+            <div className="text-white flex items-center gap-2 p-2 hover:bg-[#1a3a4a] rounded">
+              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M22 12h-4l-3 9L9 3l-3 9H2"></path>
+              </svg>
               <span>Manufacturers</span>
             </div>
-            <div className="flex items-center gap-3 hover:text-[#38b6ff] cursor-pointer">
+            
+            {/* Categories */}
+            <div className="text-white flex items-center gap-2 p-2 hover:bg-[#1a3a4a] rounded">
               <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <line x1="8" y1="6" x2="21" y2="6"></line>
-                <line x1="8" y1="12" x2="21" y2="12"></line>
-                <line x1="8" y1="18" x2="21" y2="18"></line>
-                <line x1="3" y1="6" x2="3.01" y2="6"></line>
-                <line x1="3" y1="12" x2="3.01" y2="12"></line>
-                <line x1="3" y1="18" x2="3.01" y2="18"></line>
+                <circle cx="12" cy="12" r="10"></circle>
+                <circle cx="12" cy="12" r="4"></circle>
               </svg>
               <span>Categories</span>
             </div>
-            <div className="flex items-center gap-3 hover:text-[#38b6ff] cursor-pointer">
+            
+            {/* Models */}
+            <div className="text-white flex items-center gap-2 p-2 hover:bg-[#1a3a4a] rounded">
               <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
                 <line x1="8" y1="21" x2="16" y2="21"></line>
@@ -119,147 +151,183 @@ const AssetInventory = () => {
               </svg>
               <span>Models</span>
             </div>
-            <div className="flex items-center gap-3 text-[#38b6ff] cursor-pointer">
+          </div>
+
+          {/* Divider */}
+          <div className="h-px bg-[#273C45]"></div>
+
+          <div className="p-2">
+            {/* Assets */}
+            <div className="text-white flex items-center gap-2 p-2 hover:bg-[#1a3a4a] rounded">
               <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                <line x1="3" y1="9" x2="21" y2="9"></line>
-                <line x1="9" y1="9" x2="9" y2="21"></line>
+                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+                <line x1="12" y1="22.08" x2="12" y2="12"></line>
               </svg>
               <span>Assets</span>
             </div>
-          </div>
-
-          {/* Asset Status Indicators */}
-          <div className="h-1 bg-[#273C45] my-3"></div>
-          <div className="pl-6 pr-4 space-y-2 mb-4">
-            <div className="flex items-center gap-2 text-sm">
-              <div className="w-3 h-3 rounded-full bg-green-500"></div>
-              <span>Ready to Deploy</span>
-            </div>
-            <div className="flex items-center gap-2 text-sm">
-              <div className="w-3 h-3 rounded-full bg-blue-400"></div>
-              <span>Onsite (Deployed)</span>
-            </div>
-            <div className="flex items-center gap-2 text-sm">
-              <div className="w-3 h-3 rounded-full bg-cyan-400"></div>
-              <span>WFH (Deployed)</span>
-            </div>
-            <div className="flex items-center gap-2 text-sm">
-              <div className="w-3 h-3 rounded-full bg-pink-500"></div>
-              <span>Temporarily Deployed</span>
-            </div>
-            <div className="flex items-center gap-2 text-sm">
-              <div className="w-3 h-3 rounded-full bg-orange-400"></div>
-              <span>Borrowed by ESC</span>
-            </div>
-            <div className="flex items-center gap-2 text-sm">
-              <div className="w-3 h-3 rounded-full bg-red-500"></div>
-              <span>Defective</span>
+            
+            {/* Asset Status Indicators */}
+            <div className="pl-6 space-y-1.5 mt-2">
+              <div className="flex items-center gap-2 text-sm"><div className="w-3 h-3 rounded-full bg-green-500"></div><span>Ready to Deploy</span></div>
+              <div className="flex items-center gap-2 text-sm"><div className="w-3 h-3 rounded-full bg-blue-400"></div><span>Onsite (Deployed)</span></div>
+              <div className="flex items-center gap-2 text-sm"><div className="w-3 h-3 rounded-full bg-cyan-400"></div><span>WFH (Deployed)</span></div>
+              <div className="flex items-center gap-2 text-sm"><div className="w-3 h-3 rounded-full bg-pink-500"></div><span>Temporarily Deployed</span></div>
+              <div className="flex items-center gap-2 text-sm"><div className="w-3 h-3 rounded-full bg-orange-400"></div><span>Borrowed by ESC</span></div>
+              <div className="flex items-center gap-2 text-sm"><div className="w-3 h-3 rounded-full bg-red-500"></div><span>Defective</span></div>
             </div>
           </div>
         </div>
 
-        {/* Bottom Buttons */}
-        <div className="mt-auto flex gap-2">
-          <div className="bg-[#1a3a4a] p-2 rounded flex-1 flex items-center justify-center flex-col">
-            <svg className="w-5 h-5 mb-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
-              <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
-              <line x1="12" y1="22.08" x2="12" y2="12"></line>
-            </svg>
-            <span className="text-xs">Activity Reports</span>
-          </div>
-          <div className="bg-[#1a3a4a] p-2 rounded flex-1 flex items-center justify-center flex-col">
-            <svg className="w-5 h-5 mb-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
-              <polyline points="17 21 17 13 7 13 7 21"></polyline>
-              <polyline points="7 3 7 8 15 8"></polyline>
-            </svg>
-            <span className="text-xs">Backup & Restore</span>
+        {/* Bottom Buttons Container */}
+        <div className="px-4 mt-auto absolute bottom-4 w-64">
+          <div className="flex gap-2">
+            <button className="bg-[#1a3a4a] p-2 rounded flex-1 flex items-center justify-center flex-col">
+              <svg className="w-5 h-5 mb-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+                <line x1="12" y1="22.08" x2="12" y2="12"></line>
+              </svg>
+              <span className="text-xs">Activity Reports</span>
+            </button>
+            <button className="bg-[#1a3a4a] p-2 rounded flex-1 flex items-center justify-center flex-col">
+              <svg className="w-5 h-5 mb-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+                <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                <polyline points="7 3 7 8 15 8"></polyline>
+              </svg>
+              <span className="text-xs">Backup & Restore</span>
+            </button>
           </div>
         </div>
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col p-6">
-        {/* Action Bar with Buttons and Search */}
-        <div className="flex flex-wrap justify-between items-center mb-4 gap-4">
-          {/* Left side buttons */}
-          <div className="flex gap-2 flex-wrap">
-            <button className="p-2 border border-[#38b6ff] text-white rounded-md hover:bg-[#1a3a4a] transition-colors">
-              Refresh
-            </button>
-            <button className="flex items-center gap-2 bg-[#0075a2] hover:bg-[#0088bc] text-white px-4 py-2 rounded-md transition-colors">
-              <FaPlus size={12} />
-              <span>Add</span>
-            </button>
-            <button className="flex items-center gap-2 bg-[#0075a2] hover:bg-[#0088bc] text-white px-4 py-2 rounded-md transition-colors">
-              <FaUserPlus size={12} />
-              <span>Assign</span>
-            </button>
+      <main className="flex-1 flex flex-col">
+        
+      {/* Employee Info Bar */}
+      <div className="bg-[#25424D] rounded-lg mx-10 mb-6 overflow-hidden shadow-md m-10">
+        <div className="flex items-center p-5">
+          {/* Computer Icon */}
+          <div className="mr-4 flex-shrink-0">
+            <svg className="h-10 w-10 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+              <line x1="8" y1="21" x2="16" y2="21"></line>
+              <line x1="12" y1="17" x2="12" y2="21"></line>
+            </svg>
           </div>
-
-          {/* Right side search and controls */}
-          <div className="flex items-center gap-2 flex-wrap">
-            <div className="relative w-48">
-              <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-              <input 
-                type="text" 
-                placeholder="Search Here" 
-                className="bg-[#0f1a1f] text-white pl-10 pr-4 py-2 rounded-full w-full focus:outline-none focus:ring-1 focus:ring-[#38b6ff]"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
+          
+          {/* Employee Information */}
+          <div className="grid grid-cols-5 gap-4 flex-1">
+            <div className="bg-[#16282F] rounded-lg px-3 py-2 w-20 border-2 border-[#2D5261]">
+              <p className="text-gray-400 text-xs">no.</p>
+              <p className="font-medium text-white">{employeeData.no}</p>
             </div>
-            <button className="flex items-center gap-2 bg-[#13232c] border border-gray-700 text-white px-4 py-2 rounded-md hover:bg-[#1a3a4a] transition-colors">
-              <span>Sort</span>
-            </button>
-            <button className="flex items-center gap-2 bg-[#00b868] text-white px-4 py-2 rounded-md hover:bg-[#00a05a] transition-colors">
-              <FaFileExport size={14} />
-              <span>EXPORT</span>
-            </button>
-            <button className="p-2 bg-[#ff3e4e] text-white rounded-md hover:bg-[#e02e3e] transition-colors">
-              <FaTrash />
-            </button>
+            
+            <div className="bg-[#2D5261] rounded-lg px-3 py-2 border-2 border-[#16282F]">
+              <p className="text-gray-400 text-xs">Employee Name</p>
+              <p className="font-medium text-white">{employeeData.name}</p>
+            </div>
+            
+            <div className="bg-[#2D5261] rounded-lg px-3 py-2 border-2  border-[#16282F]">
+              <p className="text-gray-400 text-xs">Generated Username</p>
+              <p className="font-medium text-white">{employeeData.username}</p>
+            </div>
+            
+            <div className="bg-[#2D5261] rounded-lg px-3 py-2 border-2  border-[#16282F]">
+              <p className="text-gray-400 text-xs">Department Assigned</p>
+              <p className="font-medium text-white">{employeeData.department}</p>
+            </div>
+            
+            <div className="bg-[#2D5261] rounded-lg px-3 py-2 border-2  border-[#16282F]">
+              <p className="text-gray-400 text-xs">Company</p>
+              <p className="font-medium text-white">{employeeData.company}</p>
+            </div>
           </div>
         </div>
+      </div>
+      
+      {/* Assets Assigned Header with Buttons */}
+      <div className="flex justify-between items-center px-4">
+        
+      </div>
+    
 
-        {/* Data Table */}
-        <div className="flex-1 overflow-auto bg-[#16282F] p-4">
-          <table className="w-full border-collapse">
-            <thead>
-              <tr className="bg-[#13232c] text-left">
-                <th className="p-3 border-b border-gray-700 w-12"></th>
-                <th className="p-3 border-b border-gray-700">Name</th>
-                <th className="p-3 border-b border-gray-700">Username</th>
-                <th className="p-3 border-b border-gray-700">Department</th>
-                <th className="p-3 border-b border-gray-700 text-center">Assets Assigned</th>
-                <th className="p-3 border-b border-gray-700">Date Added</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredAssets.map((asset) => (
-                <tr 
-                  key={asset.id} 
-                  className="border-b border-gray-700 hover:bg-[#1f2f39] hover:shadow-md transition-all duration-200"
-                >
-                  <td className="p-3">
-                    <input 
-                      type="checkbox" 
-                      className="w-4 h-4 rounded bg-[#0f1a1f] border-gray-600 accent-[#38b6ff]"
-                      checked={selectedItems.includes(asset.id)}
-                      onChange={() => handleSelect(asset.id)}
-                    />
-                  </td>
-                  <td className="p-3 font-medium">{asset.name}</td>
-                  <td className="p-3">{asset.username}</td>
-                  <td className="p-3">{asset.department}</td>
-                  <td className="p-3 text-center">{asset.assigned}</td>
-                  <td className="p-3">{asset.dateAdded}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+
+        {/* Asset Assignment Section */}
+        <div className="p-6 flex-1">
+          <div className="max-w-7xl mx-auto">
+            <div className="flex justify-between items-center mb-6">
+              <h1 className="text-2xl font-semibold text-white">Assets Assigned to Workstation</h1>
+              
+              <div className="flex gap-2">
+                <button className="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded-md transition-colors">
+                  <FaSync size={14} />
+                  <span>Refresh</span>
+                </button>
+                <button className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-md transition-colors">
+                  <FaUserPlus size={14} />
+                  <span>Assign Assets</span>
+                </button>
+                <button className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-md transition-colors">
+                  <FaUserPlus size={14} />
+                  <span>Transfer</span>
+                </button>
+                <button className="flex items-center justify-center bg-red-600 hover:bg-red-500 text-white px-4 py-2 rounded-md transition-colors">
+                  <FaTrash size={14} />
+                  <span></span>
+                </button>
+              </div>
+            </div>
+
+            {/* Data Table */}
+            <div className="bg-slate-800 rounded-md overflow-hidden">
+              <table className="w-full border-collapse">
+                <thead>
+                  <tr className="text-left text-gray-400">
+                    <th className="p-4 w-12">
+                      <input 
+                        type="checkbox" 
+                        className="w-4 h-4 rounded accent-blue-500"
+                        checked={selectedItems.length === assets.length && assets.length > 0}
+                        onChange={handleSelectAll}
+                      />
+                    </th>
+                    <th className="p-4">Asset Name</th>
+                    <th className="p-4">Image</th>
+                    <th className="p-4">Asset Tag</th>
+                    <th className="p-4">Serial Number</th>
+                    <th className="p-4">Model</th>
+                    <th className="p-4">Category</th>
+                    <th className="p-4">Asset Status</th>
+                    <th className="p-4">Date Added</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredAssets.map((asset) => (
+                    <tr 
+                      key={asset.id} 
+                      className="border-t border-slate-700 hover:bg-slate-700 transition-colors"
+                    >
+                      <td className="p-4">
+                        <input 
+                          type="checkbox" 
+                          className="w-4 h-4 rounded accent-blue-500"
+                          checked={selectedItems.includes(asset.id)}
+                          onChange={() => handleSelect(asset.id)}
+                        />
+                      </td>
+                      <td className="p-4 font-medium">{asset.name}</td>
+                      <td className="p-4">{asset.username}</td>
+                      <td className="p-4">{asset.department}</td>
+                      <td className="p-4 text-center">{asset.assigned}</td>
+                      <td className="p-4">{asset.dateAdded}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       </main>
     </div>

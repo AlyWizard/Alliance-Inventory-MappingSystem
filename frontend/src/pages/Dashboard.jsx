@@ -1,7 +1,7 @@
 // Frontend/src/pages/Dashboard.jsx
 import React, { useEffect, useState } from 'react';
 import AccountModal from '../components/modal/AccountCreation';
-import escLogo from '../assets/ESCLogo.png';
+import escLogo from '../assets/allianceLogo.png';
 import map15F from '../assets/ESC Mapping 15th.png';
 import map20F from '../assets/ESC Mapping 20th.png';
 import axios from 'axios';
@@ -348,7 +348,7 @@ function Dashboard() {
         </div>
 
         {/* Others Section */}
-        <div className="mt-auto">
+        <div className="">
           <div className="flex space-x-2 mb-4">
             <div className="bg-[#1c3640] py-1 px-2 rounded flex-1 flex items-center justify-center flex-col">
               <span className="text-base mb-1 leading-none">📊</span>
@@ -362,6 +362,11 @@ function Dashboard() {
           
           {/* Divider between About/Logout and Assets */}
           <div className="h-1 bg-[#273C45] my-2"></div>
+
+          <div className="bg-[#1c3640] py-1 px-2 rounded flex-1 flex items-center justify-center flex-col">
+              <span className="text-base mb-1 leading-none">💾</span>
+              <span className="text-[0.65rem] leading-tight">Backup</span>
+            </div>
           
           <button
             onClick={() => setIsAccountModalOpen(true)}
@@ -380,7 +385,7 @@ function Dashboard() {
           <div className="bg-[#16282F] w-full p-4 rounded-lg grid items-center justify-center" > 
             <div className="flex items-start justify-center w-full" >
               {/* Container for the Map */}
-              <div className="relative bg-[#0C181C] border-6 border-[#16282F] rounded-lg overflow-hidden w-[1290] h-[405px]">
+              <div className="relative bg-[#0C181C] border-6 border-[#16282F] rounded-lg overflow-hidden w-[1290] h-[905px]">
                 <div className="relative p-4 flex items-center justify-center mx-auto my-0" style={{ height: '405px', flex: '0 0 auto', position: 'relative' }}>
                   <div className="w-[1290] h-[405px] relative grid items-center justifsy-center">
                     {/* SVG Floor Plan */}
@@ -400,18 +405,7 @@ function Dashboard() {
                 <div className="text-2xl font-bold text-[#41b853]">{currentFloor}</div>
                 {/* Floor switcher buttons */}
                 <div className="mt-2 space-y-2">
-                  <button 
-                    className={`px-4 py-2 rounded ${currentFloor === '15F' ? 'bg-[#41b853] text-white' : 'bg-[#1c3640] text-white'}`}
-                    onClick={() => setCurrentFloor('15F')}
-                  >
-                    15F
-                  </button>
-                  <button 
-                    className={`px-4 py-2 rounded ${currentFloor === '20F' ? 'bg-[#41b853] text-white' : 'bg-[#1c3640] text-white'}`}
-                    onClick={() => setCurrentFloor('20F')}
-                  >
-                    20F
-                  </button>
+
                 </div>
               </div>
             </div>
