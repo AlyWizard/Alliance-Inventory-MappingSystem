@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { FaSearch, FaSync, FaPlus, FaUserPlus, FaFileExport, FaTrash,  } from 'react-icons/fa';
 // Replace with your actual logo file
 import allianceLogo from '../assets/allianceLogo.png'; 
+// In EmployeesInventory.jsx, change this:
 
 
 const AssetInventory = () => {

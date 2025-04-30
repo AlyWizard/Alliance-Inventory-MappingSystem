@@ -32,7 +32,10 @@ function Dashboard() {
           { workStationID: 'WSM004', empID: 1, assetCount: 0 },       // Incomplete (orange)
           { workStationID: 'WSM005', empID: 2, assetCount: 5 },       // Complete (green)
           { workStationID: 'WSM006', empID: null, assetCount: 3 },    // IT Equipment (blue)
-          { workStationID: 'WSM007', empID: 3, assetCount: 0 }        // Incomplete (orange)
+          { workStationID: 'WSM007', empID: 3, assetCount: 0 },        // Incomplete (orange)
+          { workStationID: 'WSM007', empID: 3, assetCount: 0 },        // Incomplete (orange)
+          
+
         ];
         setWorkstations(mockData);
       } catch (error) {
@@ -283,14 +286,9 @@ function Dashboard() {
       {/* Left Sidebar */}
       <aside className="w-54 min-h-screen max-h-screen flex-shrink-0 bg-[#16282F] p-4 flex flex-col flex">
         {/* Logo */}
-        <div className="flex items-center gap-2 mb-6">
-          <div className="bg-[#1e4975] w-12 h-12 rounded flex items-center justify-center">
-            <img src={escLogo} alt="ESC Logo" className="h-10 w-10" />
-          </div>
-          <div className="text-[#41b853]">
-            <h1 className="text-2xl font-bold leading-none">Esc</h1>
-            <span className="text-xs tracking-wider uppercase">CORPORATION</span>
-          </div>
+        <div className="rounded flex items-center justify-center">
+        <img src={escLogo} alt="ESC Logo" className="h-30 w-40"/>
+          {/* Logo */}
         </div>
 
         {/* Mapping Section */}
@@ -368,13 +366,22 @@ function Dashboard() {
               <span className="text-[0.65rem] leading-tight">Backup</span>
             </div>
           
-          <button
+            <button
             onClick={() => setIsAccountModalOpen(true)}
             className="bg-[#162F20] text-white py-3 px-4 rounded-xl text-sm font-semibold w-full mt-4 border-4"
             style={{ borderColor: '#4D8D36' }}
           >
             Account Creation
           </button>
+
+          <button
+          onClick={() => setIsLogoutModalOpen(true)}
+          className="bg-[#162F20] text-white py-3 px-4 rounded-xl text-sm font-semibold w-full mt-4 border-4"
+            style={{ borderColor: '#4D8D36' }}
+          >
+            Logout
+          </button>
+
         </div>
       </aside>
 

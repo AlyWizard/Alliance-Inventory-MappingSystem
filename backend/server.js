@@ -475,6 +475,740 @@ app.post('/api/workstations', async (req, res) => {
     res.status(500).json({ error: 'Failed to create workstation' });
   }
 });
+{/** 
+// ================== EMPLOYEE MANAGEMENT ROUTES ==================
+
+// Get all employees
+app.get('/api/employees', async (req, res) => {
+  try {
+    const [rows] = await db.query(`
+      SELECT * FROM employees
+      ORDER BY empID DESC
+    `);
+    res.json(rows);
+  } catch (error) {
+    console.error('Error fetching employees:', error);
+    res.status(500).json({ error: 'Failed to fetch employees' });
+  }
+});
+
+// Get employee by ID
+app.get('/api/employees/:id', async (req, res) => {
+  try {
+    const [rows] = await db.query(`
+      SELECT * FROM employees
+      WHERE empID = ?
+    `, [req.params.id]);
+    
+    if (rows.length === 0) {
+      res.status(404).json({ error: 'Employee not found' });
+      return;
+    }
+    
+    res.json(rows[0]);
+  } catch (error) {
+    console.error('Error fetching employee:', error);
+    res.status(500).json({ error: 'Failed to fetch employee' });
+  }
+});
+
+// Create new employee
+app.post('/api/employees', async (req, res) => {
+  try {
+    const { 
+      empFirstName, 
+      empLastName, 
+      empUserName, 
+      empDept,
+      employeeCount,
+      employeeStatus,
+      created_at,
+      updated_at
+    } = req.body;
+    
+    // Check if username already exists
+    const [existingEmps] = await db.query(`
+      SELECT * FROM employees WHERE empUserName = ?
+    `, [empUserName]);
+    
+    if (existingEmps.length > 0) {
+      return res.status(400).json({ 
+        errors: { empUserName: 'Username already exists' }
+      });
+    }
+    
+    // Insert new employee
+    const [result] = await db.query(`
+      INSERT INTO employees (
+        empFirstName, 
+        empLastName, 
+        empUserName, 
+        empDept,
+        employeeCount,
+        employeeStatus,
+        created_at, 
+        updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())
+    `, [
+      empFirstName, 
+      empLastName, 
+      empUserName, 
+      empDept,
+      employeeCount || 0,
+      employeeStatus || 'active'
+    ]);
+    
+    // Get the newly created employee
+    const [newEmployee] = await db.query(`
+      SELECT * FROM employees
+      WHERE empID = ?
+    `, [result.insertId]);
+    
+    res.status(201).json(newEmployee[0]);
+  } catch (error) {
+    console.error('Error creating employee:', error);
+    res.status(500).json({ error: 'Failed to create employee' });
+  }
+});
+
+// Update employee
+app.put('/api/employees/:id', async (req, res) => {
+  try {
+    const { 
+      empFirstName, 
+      empLastName, 
+      empUserName, 
+      empDept,
+      employeeCount,
+      employeeStatus
+    } = req.body;
+    
+    // Check if username already exists (excluding current employee)
+    if (empUserName) {
+      const [existingEmps] = await db.query(`
+        SELECT * FROM employees 
+        WHERE empUserName = ? AND empID != ?
+      `, [empUserName, req.params.id]);
+      
+      if (existingEmps.length > 0) {
+        return res.status(400).json({ 
+          errors: { empUserName: 'Username already exists' }
+        });
+      }
+    }
+    
+    // Build dynamic update SQL
+    const updateFields = [];
+    const updateValues = [];
+    
+    if (empFirstName !== undefined) {
+      updateFields.push('empFirstName = ?');
+      updateValues.push(empFirstName);
+    }
+    
+    if (empLastName !== undefined) {
+      updateFields.push('empLastName = ?');
+      updateValues.push(empLastName);
+    }
+    
+    if (empUserName !== undefined) {
+      updateFields.push('empUserName = ?');
+      updateValues.push(empUserName);
+    }
+    
+    if (empDept !== undefined) {
+      updateFields.push('empDept = ?');
+      updateValues.push(empDept);
+    }
+    
+    if (employeeCount !== undefined) {
+      updateFields.push('employeeCount = ?');
+      updateValues.push(employeeCount);
+    }
+    
+    if (employeeStatus !== undefined) {
+      updateFields.push('employeeStatus = ?');
+      updateValues.push(employeeStatus);
+    }
+    
+    updateFields.push('updated_at = NOW()');
+    
+    // Add the ID to the update values
+    updateValues.push(req.params.id);
+    
+    if (updateFields.length === 0) {
+      return res.status(400).json({ error: 'No fields to update' });
+    }
+    
+    // Update the employee
+    await db.query(`
+      UPDATE employees SET ${updateFields.join(', ')} WHERE empID = ?
+    `, updateValues);
+    
+    // Get the updated employee
+    const [updatedEmployee] = await db.query(`
+      SELECT * FROM employees
+      WHERE empID = ?
+    `, [req.params.id]);
+    
+    if (updatedEmployee.length === 0) {
+      return res.status(404).json({ error: 'Employee not found' });
+    }
+    
+    res.json(updatedEmployee[0]);
+  } catch (error) {
+    console.error('Error updating employee:', error);
+    res.status(500).json({ error: 'Failed to update employee' });
+  }
+});
+
+// Delete employee
+app.delete('/api/employees/:id', async (req, res) => {
+  try {
+    // Check if employee exists
+    const [employee] = await db.query(`
+      SELECT * FROM employees WHERE empID = ?
+    `, [req.params.id]);
+    
+    if (employee.length === 0) {
+      return res.status(404).json({ error: 'Employee not found' });
+    }
+    
+    // Delete the employee
+    await db.query(`
+      DELETE FROM employees WHERE empID = ?
+    `, [req.params.id]);
+    
+    res.status(204).send();
+  } catch (error) {
+    console.error('Error deleting employee:', error);
+    res.status(500).json({ error: 'Failed to delete employee' });
+  }
+});
+
+// Get all departments (for dropdown)
+app.get('/api/departments', async (req, res) => {
+  try {
+    // If you have a departments table, query it
+    // If not, send dummy data
+    try {
+      const [departments] = await db.query('SELECT * FROM departments');
+      res.json(departments);
+    } catch (err) {
+      // Fallback if the table doesn't exist
+      res.json([
+        { deptID: 1, deptName: 'IT' },
+        { deptID: 2, deptName: 'HR' },
+        { deptID: 3, deptName: 'Finance' },
+        { deptID: 4, deptName: 'Marketing' },
+        { deptID: 5, deptName: 'Operations' },
+        { deptID: 6, deptName: 'Alliance IT Department - Intern' }
+      ]);
+    }
+  } catch (error) {
+    console.error('Error fetching departments:', error);
+    res.status(500).json({ error: 'Failed to fetch departments' });
+  }
+});
+
+// Keep track of deleted employee IDs
+app.get('/api/employees/next-available-id', async (req, res) => {
+  try {
+    // First, check if there are any gaps in the ID sequence
+    const [result] = await db.query(`
+      SELECT empID + 1 as next_id
+      FROM employees e1
+      WHERE NOT EXISTS (
+        SELECT 1 FROM employees e2 WHERE e2.empID = e1.empID + 1
+      )
+      ORDER BY empID
+      LIMIT 1
+    `);
+
+    // If there's a gap, return the first available ID
+    if (result.length > 0) {
+      return res.json({ nextId: result[0].next_id });
+    }
+
+    // If no gaps, get the maximum ID and return the next one
+    const [maxResult] = await db.query(`
+      SELECT IFNULL(MAX(empID), 0) + 1 as next_id
+      FROM employees
+    `);
+
+    res.json({ nextId: maxResult[0].next_id });
+  } catch (error) {
+    console.error('Error finding next available ID:', error);
+    res.status(500).json({ error: 'Failed to determine next available ID' });
+  }
+}); */}
+
+// ================== EMPLOYEE MANAGEMENT ROUTES ==================
+
+// Get all employees
+app.get('/api/employees', async (req, res) => {
+  try {
+    const [rows] = await db.query(`
+      SELECT * FROM employees
+      ORDER BY empID DESC
+    `);
+    res.json(rows);
+  } catch (error) {
+    console.error('Error fetching employees:', error);
+    res.status(500).json({ error: 'Failed to fetch employees' });
+  }
+});
+
+// Get employee by ID
+app.get('/api/employees/:id', async (req, res) => {
+  try {
+    const [rows] = await db.query(`
+      SELECT * FROM employees
+      WHERE empID = ?
+    `, [req.params.id]);
+    
+    if (rows.length === 0) {
+      res.status(404).json({ error: 'Employee not found' });
+      return;
+    }
+    
+    res.json(rows[0]);
+  } catch (error) {
+    console.error('Error fetching employee:', error);
+    res.status(500).json({ error: 'Failed to fetch employee' });
+  }
+});
+
+// Create new employee
+app.post('/api/employees', async (req, res) => {
+  try {
+    const { 
+      empFirstName, 
+      empLastName, 
+      empUserName, 
+      empDept,
+      employeeCount,
+      employeeStatus
+    } = req.body;
+    
+    // Check if username already exists
+    const [existingEmps] = await db.query(`
+      SELECT * FROM employees WHERE empUserName = ?
+    `, [empUserName]);
+    
+    if (existingEmps.length > 0) {
+      return res.status(400).json({ 
+        errors: { empUserName: 'Username already exists' }
+      });
+    }
+    
+    // Insert new employee
+    const [result] = await db.query(`
+      INSERT INTO employees (
+        empFirstName, 
+        empLastName, 
+        empUserName, 
+        empDept,
+        employeeCount,
+        employeeStatus,
+        created_at, 
+        updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())
+    `, [
+      empFirstName, 
+      empLastName, 
+      empUserName, 
+      empDept,
+      employeeCount || 0,
+      employeeStatus || 'active'
+    ]);
+    
+    // Get the newly created employee
+    const [newEmployee] = await db.query(`
+      SELECT * FROM employees
+      WHERE empID = ?
+    `, [result.insertId]);
+    
+    res.status(201).json(newEmployee[0]);
+  } catch (error) {
+    console.error('Error creating employee:', error);
+    res.status(500).json({ 
+      error: 'Failed to create employee',
+      message: error.message
+    });
+  }
+});
+
+// Update employee
+app.put('/api/employees/:id', async (req, res) => {
+  try {
+    const { 
+      empFirstName, 
+      empLastName, 
+      empUserName, 
+      empDept,
+      employeeCount,
+      employeeStatus
+    } = req.body;
+    
+    // Check if username already exists (excluding current employee)
+    if (empUserName) {
+      const [existingEmps] = await db.query(`
+        SELECT * FROM employees 
+        WHERE empUserName = ? AND empID != ?
+      `, [empUserName, req.params.id]);
+      
+      if (existingEmps.length > 0) {
+        return res.status(400).json({ 
+          errors: { empUserName: 'Username already exists' }
+        });
+      }
+    }
+    
+    // Build dynamic update SQL
+    const updateFields = [];
+    const updateValues = [];
+    
+    if (empFirstName !== undefined) {
+      updateFields.push('empFirstName = ?');
+      updateValues.push(empFirstName);
+    }
+    
+    if (empLastName !== undefined) {
+      updateFields.push('empLastName = ?');
+      updateValues.push(empLastName);
+    }
+    
+    if (empUserName !== undefined) {
+      updateFields.push('empUserName = ?');
+      updateValues.push(empUserName);
+    }
+    
+    if (empDept !== undefined) {
+      updateFields.push('empDept = ?');
+      updateValues.push(empDept);
+    }
+    
+    if (employeeCount !== undefined) {
+      updateFields.push('employeeCount = ?');
+      updateValues.push(employeeCount);
+    }
+    
+    if (employeeStatus !== undefined) {
+      updateFields.push('employeeStatus = ?');
+      updateValues.push(employeeStatus);
+    }
+    
+    // Always update the updated_at timestamp
+    updateFields.push('updated_at = NOW()');
+    
+    // Add the ID to the update values
+    updateValues.push(req.params.id);
+    
+    if (updateFields.length === 0) {
+      return res.status(400).json({ error: 'No fields to update' });
+    }
+    
+    // Update the employee
+    await db.query(`
+      UPDATE employees SET ${updateFields.join(', ')} WHERE empID = ?
+    `, updateValues);
+    
+    // Get the updated employee
+    const [updatedEmployee] = await db.query(`
+      SELECT * FROM employees
+      WHERE empID = ?
+    `, [req.params.id]);
+    
+    if (updatedEmployee.length === 0) {
+      return res.status(404).json({ error: 'Employee not found' });
+    }
+    
+    res.json(updatedEmployee[0]);
+  } catch (error) {
+    console.error('Error updating employee:', error);
+    res.status(500).json({ error: 'Failed to update employee' });
+  }
+});
+
+// Delete employee
+app.delete('/api/employees/:id', async (req, res) => {
+  try {
+    // Check if employee exists
+    const [employee] = await db.query(`
+      SELECT * FROM employees WHERE empID = ?
+    `, [req.params.id]);
+    
+    if (employee.length === 0) {
+      return res.status(404).json({ error: 'Employee not found' });
+    }
+    
+    // Delete the employee
+    await db.query(`
+      DELETE FROM employees WHERE empID = ?
+    `, [req.params.id]);
+    
+    res.status(204).send();
+  } catch (error) {
+    console.error('Error deleting employee:', error);
+    res.status(500).json({ error: 'Failed to delete employee' });
+  }
+});
+
+// Get all departments (for dropdown)
+app.get('/api/departments', async (req, res) => {
+  try {
+    // If you have a departments table, query it
+    // If not, send dummy data
+    try {
+      const [departments] = await db.query('SELECT * FROM departments');
+      if (departments.length > 0) {
+        res.json(departments);
+      } else {
+        throw new Error('No departments found');
+      }
+    } catch (err) {
+      // Fallback if the table doesn't exist or is empty
+      res.json([
+        { deptID: 1, deptName: 'IT' },
+        { deptID: 2, deptName: 'HR' },
+        { deptID: 3, deptName: 'Finance' },
+        { deptID: 4, deptName: 'Marketing' },
+        { deptID: 5, deptName: 'Operations' },
+        { deptID: 6, deptName: 'Alliance IT Department - Intern' },
+        { deptID: 7, deptName: 'Accounting' },
+        { deptID: 8, deptName: 'Broker Experience' },
+        { deptID: 9, deptName: 'Escalation' },
+        { deptID: 10, deptName: 'AU Accounts' },
+        { deptID: 11, deptName: 'PHD' },
+        { deptID: 12, deptName: 'Source' },
+        { deptID: 13, deptName: 'Data Entry' },
+        { deptID: 14, deptName: 'QA Packaging' },
+        { deptID: 15, deptName: 'Credit' },
+        { deptID: 16, deptName: 'Client Care' },
+        { deptID: 17, deptName: 'Admin' },
+        { deptID: 18, deptName: 'Training' }
+      ]);
+    }
+  } catch (error) {
+    console.error('Error fetching departments:', error);
+    res.status(500).json({ error: 'Failed to fetch departments' });
+  }
+});
+
+
+// ================== CATEGORY MANAGEMENT ROUTES ==================
+
+// Get all categories
+app.get('/api/categories', async (req, res) => {
+  try {
+    const [rows] = await db.query(`
+      SELECT * FROM categories
+      ORDER BY categoryID DESC
+    `);
+    res.json(rows);
+  } catch (error) {
+    console.error('Error fetching categories:', error);
+    res.status(500).json({ error: 'Failed to fetch categories' });
+  }
+});
+
+// Get category by ID
+app.get('/api/categories/:id', async (req, res) => {
+  try {
+    const [rows] = await db.query(`
+      SELECT * FROM categories
+      WHERE categoryID = ?
+    `, [req.params.id]);
+    
+    if (rows.length === 0) {
+      res.status(404).json({ error: 'Category not found' });
+      return;
+    }
+    
+    res.json(rows[0]);
+  } catch (error) {
+    console.error('Error fetching category:', error);
+    res.status(500).json({ error: 'Failed to fetch category' });
+  }
+});
+
+// Create new category
+app.post('/api/categories', async (req, res) => {
+  try {
+    const { 
+      categoryName, 
+      categoryType,
+      categoryCount
+    } = req.body;
+    
+    // Check if category already exists
+    const [existingCats] = await db.query(`
+      SELECT * FROM categories WHERE categoryName = ? AND categoryType = ?
+    `, [categoryName, categoryType]);
+    
+    if (existingCats.length > 0) {
+      return res.status(400).json({ 
+        errors: { categoryName: 'Category with this name and type already exists' }
+      });
+    }
+    
+    // Insert new category
+    const [result] = await db.query(`
+      INSERT INTO categories (
+        categoryName, 
+        categoryType, 
+        categoryCount, 
+        created_at, 
+        updated_at
+      ) VALUES (?, ?, ?, NOW(), NOW())
+    `, [
+      categoryName, 
+      categoryType, 
+      categoryCount || 0
+    ]);
+    
+    // Get the newly created category
+    const [newCategory] = await db.query(`
+      SELECT * FROM categories
+      WHERE categoryID = ?
+    `, [result.insertId]);
+    
+    res.status(201).json(newCategory[0]);
+  } catch (error) {
+    console.error('Error creating category:', error);
+    res.status(500).json({ 
+      error: 'Failed to create category',
+      message: error.message
+    });
+  }
+});
+
+// Update category
+app.put('/api/categories/:id', async (req, res) => {
+  try {
+    const { 
+      categoryName, 
+      categoryType
+    } = req.body;
+    
+    // Check if category already exists (excluding current category)
+    if (categoryName && categoryType) {
+      const [existingCats] = await db.query(`
+        SELECT * FROM categories 
+        WHERE categoryName = ? AND categoryType = ? AND categoryID != ?
+      `, [categoryName, categoryType, req.params.id]);
+      
+      if (existingCats.length > 0) {
+        return res.status(400).json({ 
+          errors: { categoryName: 'Category with this name and type already exists' }
+        });
+      }
+    }
+    
+    // Build dynamic update SQL
+    const updateFields = [];
+    const updateValues = [];
+    
+    if (categoryName !== undefined) {
+      updateFields.push('categoryName = ?');
+      updateValues.push(categoryName);
+    }
+    
+    if (categoryType !== undefined) {
+      updateFields.push('categoryType = ?');
+      updateValues.push(categoryType);
+    }
+    
+    // Always update the updated_at timestamp
+    updateFields.push('updated_at = NOW()');
+    
+    // Add the ID to the update values
+    updateValues.push(req.params.id);
+    
+    if (updateFields.length === 0) {
+      return res.status(400).json({ error: 'No fields to update' });
+    }
+    
+    // Update the category
+    await db.query(`
+      UPDATE categories SET ${updateFields.join(', ')} WHERE categoryID = ?
+    `, updateValues);
+    
+    // Get the updated category
+    const [updatedCategory] = await db.query(`
+      SELECT * FROM categories
+      WHERE categoryID = ?
+    `, [req.params.id]);
+    
+    if (updatedCategory.length === 0) {
+      return res.status(404).json({ error: 'Category not found' });
+    }
+    
+    res.json(updatedCategory[0]);
+  } catch (error) {
+    console.error('Error updating category:', error);
+    res.status(500).json({ error: 'Failed to update category' });
+  }
+});
+
+// Delete category
+app.delete('/api/categories/:id', async (req, res) => {
+  try {
+    // Check if category exists
+    const [category] = await db.query(`
+      SELECT * FROM categories WHERE categoryID = ?
+    `, [req.params.id]);
+    
+    if (category.length === 0) {
+      return res.status(404).json({ error: 'Category not found' });
+    }
+    
+    // Delete the category
+    await db.query(`
+      DELETE FROM categories WHERE categoryID = ?
+    `, [req.params.id]);
+    
+    res.status(204).send();
+  } catch (error) {
+    console.error('Error deleting category:', error);
+    res.status(500).json({ error: 'Failed to delete category' });
+  }
+});
+
+// Update category count (for when assets get assigned to a category)
+app.patch('/api/categories/:id/count', async (req, res) => {
+  try {
+    const { count } = req.body;
+    
+    if (count === undefined) {
+      return res.status(400).json({ error: 'Count is required' });
+    }
+    
+    // Update the category count
+    await db.query(`
+      UPDATE categories 
+      SET categoryCount = ?, 
+          updated_at = NOW() 
+      WHERE categoryID = ?
+    `, [count, req.params.id]);
+    
+    // Get the updated category
+    const [updatedCategory] = await db.query(`
+      SELECT * FROM categories
+      WHERE categoryID = ?
+    `, [req.params.id]);
+    
+    if (updatedCategory.length === 0) {
+      return res.status(404).json({ error: 'Category not found' });
+    }
+    
+    res.json(updatedCategory[0]);
+  } catch (error) {
+    console.error('Error updating category count:', error);
+    res.status(500).json({ error: 'Failed to update category count' });
+  }
+});
 
 // Start the server
 const PORT = process.env.PORT || 3001;

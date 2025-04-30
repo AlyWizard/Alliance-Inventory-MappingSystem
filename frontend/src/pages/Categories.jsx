@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { FaSearch, FaSyncAlt, FaPlus, FaFileExport, FaTrash, FaEdit, FaFilter } from 'react-icons/fa';
 import axios from '../api';
-import AddEmployeeModal from '../components/AddEmployeeModal';
-import EditEmployeeModal from '../components/EditEmployeeModal';
+import AddCategoryModal from '../components/AddCategoryModal';
+import EditCategoryModal from '../components/EditCategoryModal';
 
-const EmployeesInventory = () => {
-  // State for employees data
-  const [employees, setEmployees] = useState([]);
+const Categories = () => {
+  // State for categories data
+  const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -17,46 +17,47 @@ const EmployeesInventory = () => {
   // State for modals
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [currentEmployee, setCurrentEmployee] = useState(null);
+  const [currentCategory, setCurrentCategory] = useState(null);
   
   // State for filters
   const [filterOpen, setFilterOpen] = useState(false);
   const [filters, setFilters] = useState({
-    department: '',
-    status: ''
+    categoryType: ''
   });
 
-  // Fetch departments for filters
-  const [departments, setDepartments] = useState([]);
+  // Removed predefined category types since we now use free text input
+  // const categoryTypes = [
+  //   'Computer',
+  //   'Laptop',
+  //   'Monitor',
+  //   'Peripheral',
+  //   'Networking',
+  //   'Storage',
+  //   'Mobile',
+  //   'Hardware',
+  //   'Software',
+  //   'Office Equipment',
+  //   'Furniture',
+  //   'Other'
+  // ];
 
-  // Fetch employees on component mount
+  // Fetch categories on component mount
   useEffect(() => {
-    fetchEmployees();
-    fetchDepartments();
+    fetchCategories();
   }, []);
 
-  // Fetch employees from API
-  const fetchEmployees = async () => {
+  // Fetch categories from API
+  const fetchCategories = async () => {
     setLoading(true);
     try {
-      const response = await axios.get('/api/employees');
-      setEmployees(response.data);
+      const response = await axios.get('/api/categories');
+      setCategories(response.data);
       setError(null);
     } catch (err) {
-      console.error('Error fetching employees:', err);
-      setError('Failed to load employees. Please try again.');
+      console.error('Error fetching categories:', err);
+      setError('Failed to load categories. Please try again.');
     } finally {
       setLoading(false);
-    }
-  };
-
-  // Fetch departments from API
-  const fetchDepartments = async () => {
-    try {
-      const response = await axios.get('/api/departments');
-      setDepartments(response.data);
-    } catch (err) {
-      console.error('Error fetching departments:', err);
     }
   };
 
@@ -71,58 +72,58 @@ const EmployeesInventory = () => {
 
   // Handle select all
   const handleSelectAll = () => {
-    if (selectedItems.length === filteredEmployees.length) {
+    if (selectedItems.length === filteredCategories.length) {
       setSelectedItems([]);
     } else {
-      setSelectedItems(filteredEmployees.map(employee => employee.empID));
+      setSelectedItems(filteredCategories.map(category => category.categoryID));
     }
   };
 
-  // Handle bulk employee deletion
+  // Handle bulk category deletion
   const handleBulkDelete = async () => {
     if (!selectedItems.length) return;
     
-    if (window.confirm(`Are you sure you want to delete ${selectedItems.length} selected employee(s)?`)) {
+    if (window.confirm(`Are you sure you want to delete ${selectedItems.length} selected category(s)?`)) {
       setLoading(true);
       try {
-        // Delete each selected employee
+        // Delete each selected category
         await Promise.all(selectedItems.map(id => 
-          axios.delete(`/api/employees/${id}`)
+          axios.delete(`/api/categories/${id}`)
         ));
         
-        // Refresh employees and clear selection
-        fetchEmployees();
+        // Refresh categories and clear selection
+        fetchCategories();
         setSelectedItems([]);
       } catch (err) {
-        console.error('Error deleting employees:', err);
-        setError('Failed to delete employees. Please try again.');
+        console.error('Error deleting categories:', err);
+        setError('Failed to delete categories. Please try again.');
       } finally {
         setLoading(false);
       }
     }
   };
 
-  // Handle single employee deletion
+  // Handle single category deletion
   const handleSingleDelete = async (id) => {
-    if (window.confirm('Are you sure you want to delete this employee?')) {
+    if (window.confirm('Are you sure you want to delete this category?')) {
       setLoading(true);
       try {
-        await axios.delete(`/api/employees/${id}`);
-        // Refresh employees and remove from selected items if present
-        fetchEmployees();
+        await axios.delete(`/api/categories/${id}`);
+        // Refresh categories and remove from selected items if present
+        fetchCategories();
         setSelectedItems(selectedItems.filter(item => item !== id));
       } catch (err) {
-        console.error('Error deleting employee:', err);
-        setError('Failed to delete employee. Please try again.');
+        console.error('Error deleting category:', err);
+        setError('Failed to delete category. Please try again.');
       } finally {
         setLoading(false);
       }
     }
   };
 
-  // Handle edit employee
-  const handleEdit = (employee) => {
-    setCurrentEmployee(employee);
+  // Handle edit category
+  const handleEdit = (category) => {
+    setCurrentCategory(category);
     setIsEditModalOpen(true);
   };
 
@@ -138,45 +139,36 @@ const EmployeesInventory = () => {
   // Reset filters
   const resetFilters = () => {
     setFilters({
-      department: '',
-      status: ''
+      categoryType: ''
     });
     setFilterOpen(false);
   };
 
-  // Filter employees based on search and filters
-  const filteredEmployees = employees.filter(employee => {
+  // Filter categories based on search and filters
+  const filteredCategories = categories.filter(category => {
     // Search filter
     const matchesSearch = (
-      (employee.empFirstName + ' ' + employee.empLastName).toLowerCase().includes(searchTerm.toLowerCase()) ||
-      employee.empUserName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      employee.empDept?.toLowerCase().includes(searchTerm.toLowerCase())
+      category.categoryName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      category.categoryType?.toLowerCase().includes(searchTerm.toLowerCase())
     );
     
-    // Department filter
-    const matchesDepartment = filters.department === '' || employee.empDept === filters.department;
+    // Category type filter - now does a partial match instead of exact match
+    const matchesType = filters.categoryType === '' || 
+      category.categoryType?.toLowerCase().includes(filters.categoryType.toLowerCase());
     
-    // Status filter
-    const matchesStatus = filters.status === '' || employee.employeeStatus === filters.status;
-    
-    return matchesSearch && matchesDepartment && matchesStatus;
+    return matchesSearch && matchesType;
   });
 
-  // Handle successful employee addition
-  const handleEmployeeAdded = (newEmployee) => {
-    setEmployees([newEmployee, ...employees]);
+  // Handle successful category addition
+  const handleCategoryAdded = (newCategory) => {
+    setCategories([newCategory, ...categories]);
   };
 
-  // Handle successful employee update
-  const handleEmployeeUpdated = (updatedEmployee) => {
-    setEmployees(employees.map(emp => 
-      emp.empID === updatedEmployee.empID ? updatedEmployee : emp
+  // Handle successful category update
+  const handleCategoryUpdated = (updatedCategory) => {
+    setCategories(categories.map(cat => 
+      cat.categoryID === updatedCategory.categoryID ? updatedCategory : cat
     ));
-  };
-
-  // Format employee name from first and last name
-  const formatName = (employee) => {
-    return `${employee.empFirstName} ${employee.empLastName}`;
   };
 
   // Format date to match the design
@@ -222,8 +214,8 @@ const EmployeesInventory = () => {
         <div className="mx-4 bg-[#16282F] rounded-md mb-6 border border-[#273C45] overflow-hidden">
           {/* Main Menu Items */}
           <div className="p-2 space-y-1">
-            {/* Employees (Active) */}
-            <div className="bg-[#38b6ff] text-white rounded flex items-center gap-2 p-2">
+            {/* Employees */}
+            <div className="text-white flex items-center gap-2 p-2 hover:bg-[#1a3a4a] rounded">
               <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
                 <path d="M17 2L12 7 7 2"></path>
@@ -264,8 +256,8 @@ const EmployeesInventory = () => {
               <span>Manufacturers</span>
             </div>
             
-            {/* Categories */}
-            <div className="text-white flex items-center gap-2 p-2 hover:bg-[#1a3a4a] rounded">
+            {/* Categories (Active) */}
+            <div className="bg-[#38b6ff] text-white rounded flex items-center gap-2 p-2">
               <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <circle cx="12" cy="12" r="10"></circle>
                 <circle cx="12" cy="12" r="4"></circle>
@@ -337,12 +329,12 @@ const EmployeesInventory = () => {
       <main className="flex-1 p-6">
         {/* Title Bar Container */}
         <div className="flex justify-between items-center mb-6">
-          <h1 className="text-xl font-semibold">Employees</h1>
+          <h1 className="text-xl font-semibold">Categories</h1>
           <div className="flex gap-2 items-center">
             {/* Refresh Button */}
             <button 
               className="bg-[#13232c] border border-[#273C45] rounded-md w-8 h-8 flex items-center justify-center"
-              onClick={fetchEmployees}
+              onClick={fetchCategories}
             >
               <FaSyncAlt className="w-4 h-4" />
             </button>
@@ -407,37 +399,17 @@ const EmployeesInventory = () => {
               </button>
             </div>
             <div className="grid grid-cols-3 gap-4">
-              {/* Department Filter */}
+              {/* Category Type Filter - Now as text input */}
               <div>
-                <label className="block text-gray-400 text-sm mb-1">Department</label>
-                <select
-                  name="department"
-                  value={filters.department}
+                <label className="block text-gray-400 text-sm mb-1">Filter by Category Type</label>
+                <input
+                  type="text"
+                  name="categoryType"
+                  value={filters.categoryType}
                   onChange={handleFilterChange}
-                  className="w-full bg-[#1F3A45] rounded p-2 appearance-none"
-                >
-                  <option value="">All Departments</option>
-                  {departments.map((dept, index) => (
-                    <option key={index} value={dept.deptName}>
-                      {dept.deptName}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              
-              {/* Status Filter */}
-              <div>
-                <label className="block text-gray-400 text-sm mb-1">Status</label>
-                <select
-                  name="status"
-                  value={filters.status}
-                  onChange={handleFilterChange}
-                  className="w-full bg-[#1F3A45] rounded p-2 appearance-none"
-                >
-                  <option value="">All Statuses</option>
-                  <option value="active">Active</option>
-                  <option value="inactive">Inactive</option>
-                </select>
+                  className="w-full bg-[#1F3A45] rounded p-2"
+                  placeholder="Enter category type to filter"
+                />
               </div>
             </div>
           </div>
@@ -460,68 +432,60 @@ const EmployeesInventory = () => {
         {/* Table */}
         <div className="bg-[#16282F] rounded-md overflow-hidden">
           {/* Table Header */}
-          <div className="bg-[#13232c] grid grid-cols-8 py-3 px-4 text-gray-300">
+          <div className="bg-[#13232c] grid grid-cols-7 py-3 px-4 text-gray-300">
             <div className="flex items-center">
               <input 
                 type="checkbox"
                 className="w-4 h-4 bg-transparent border-gray-600 accent-[#38b6ff]"
-                checked={selectedItems.length === filteredEmployees.length && filteredEmployees.length > 0}
+                checked={selectedItems.length === filteredCategories.length && filteredCategories.length > 0}
                 onChange={handleSelectAll}
-                disabled={filteredEmployees.length === 0}
+                disabled={filteredCategories.length === 0}
               />
             </div>
-            <div>Name</div>
-            <div>Username</div>
-            <div>Emp #</div>
-            <div>Department</div>
-            <div>Status</div>
-            <div>Date Added</div>
+            <div>Category ID</div>
+            <div>Category Name</div>
+            <div>Category Type</div>
+            <div>Category Count</div>
+            <div>Date Created</div>
             <div className="text-center">Actions</div>
           </div>
           
           {/* Table Rows */}
-          {filteredEmployees.length === 0 ? (
+          {filteredCategories.length === 0 ? (
             <div className="py-4 px-4 text-center text-gray-400">
-              {loading ? 'Loading employees...' : 'No employees found.'}
+              {loading ? 'Loading categories...' : 'No categories found.'}
             </div>
           ) : (
-            filteredEmployees.map((employee) => (
+            filteredCategories.map((category) => (
               <div 
-                key={employee.empID} 
-                className="grid grid-cols-8 py-3 px-4 border-b border-[#1e2d36] hover:bg-[#182a35] transition-colors"
+                key={category.categoryID} 
+                className="grid grid-cols-7 py-3 px-4 border-b border-[#1e2d36] hover:bg-[#182a35] transition-colors"
               >
                 <div className="flex items-center">
                   <input
                     type="checkbox"
                     className="w-4 h-4 bg-transparent border-gray-600 accent-[#38b6ff]"
-                    checked={selectedItems.includes(employee.empID)}
-                    onChange={() => handleSelect(employee.empID)}
+                    checked={selectedItems.includes(category.categoryID)}
+                    onChange={() => handleSelect(category.categoryID)}
                   />
                 </div>
-                <div>{formatName(employee)}</div>
-                <div>{employee.empUserName}</div>
-                <div>{employee.empID.toString().padStart(2, '0')}</div>
-                <div>{employee.empDept}</div>
-                <div>
-                  <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs ${
-                    employee.employeeStatus === 'active' ? 'bg-green-900 text-green-300' : 'bg-red-900 text-red-300'
-                  }`}>
-                    {employee.employeeStatus || 'active'}
-                  </span>
-                </div>
-                <div>{formatDate(employee.created_at)}</div>
+                <div>{category.categoryID.toString().padStart(2, '0')}</div>
+                <div>{category.categoryName}</div>
+                <div>{category.categoryType}</div>
+                <div>{category.categoryCount}</div>
+                <div>{formatDate(category.created_at)}</div>
                 <div className="flex items-center justify-center space-x-3">
                   <button 
-                    onClick={() => handleEdit(employee)}
+                    onClick={() => handleEdit(category)}
                     className="text-[#38b6ff] hover:text-[#5bc2ff]"
-                    title="Edit employee"
+                    title="Edit category"
                   >
                     <FaEdit className="w-4 h-4" />
                   </button>
                   <button 
-                    onClick={() => handleSingleDelete(employee.empID)}
+                    onClick={() => handleSingleDelete(category.categoryID)}
                     className="text-[#ff3e4e] hover:text-[#ff6b78]"
-                    title="Delete employee"
+                    title="Delete category"
                   >
                     <FaTrash className="w-4 h-4" />
                   </button>
@@ -532,22 +496,22 @@ const EmployeesInventory = () => {
         </div>
       </main>
 
-      {/* Add Employee Modal */}
-      <AddEmployeeModal 
+      {/* Add Category Modal */}
+      <AddCategoryModal 
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
-        onSuccess={handleEmployeeAdded}
+        onSuccess={handleCategoryAdded}
       />
 
-      {/* Edit Employee Modal */}
-      <EditEmployeeModal 
+      {/* Edit Category Modal */}
+      <EditCategoryModal 
         isOpen={isEditModalOpen}
         onClose={() => setIsEditModalOpen(false)}
-        onSuccess={handleEmployeeUpdated}
-        employee={currentEmployee}
+        onSuccess={handleCategoryUpdated}
+        category={currentCategory}
       />
     </div>
   );
 };
 
-export default EmployeesInventory;
+export default Categories;
