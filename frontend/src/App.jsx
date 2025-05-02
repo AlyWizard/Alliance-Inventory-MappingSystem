@@ -6,6 +6,12 @@ import Login from './pages/LoginPage';
 import EmployeesInventory from './pages/EmployeesInventory';
 import Assets from './pages/Assets';
 import Categories from './pages/Categories';
+import Model from './pages/Model';
+import Manufacturer from './pages/Manufacturer';
+
+
+
+
 
 function App() {
   return (
@@ -18,6 +24,8 @@ function App() {
         <Route path="/employees" element={<EmployeesInventory />} />
         <Route path="/assets" element={<Assets />} />
         <Route path="/categories" element={<Categories />} />
+        <Route path="/model" element={<Model />} />
+        <Route path="/manufacturer" element={<Manufacturer />} />
       </Routes>
     </Router>
   );

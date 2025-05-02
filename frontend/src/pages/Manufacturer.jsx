@@ -1,19 +1,15 @@
-// Model.jsx
+// Manufacturer.jsx
 import React, { useState, useEffect } from 'react';
 import { FaSearch, FaSyncAlt, FaPlus, FaFileExport, FaTrash, FaEdit, FaFilter } from 'react-icons/fa';
 import axios from '../api';
-import AddModelModal from '../components/AddModelModal';
-import EditModelModal from '../components/EditModelModal';
+import AddManufacturerModal from '../components/AddManufacturerModal';
+import EditManufacturerModal from '../components/EditManufacturerModal';
 
-const Model = () => {
-  // State for models data
-  const [models, setModels] = useState([]);
+const Manufacturer = () => {
+  // State for manufacturers data
+  const [manufacturers, setManufacturers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-
-  // State for categories and manufacturers (for dropdowns)
-  const [categories, setCategories] = useState([]);
-  const [manufacturers, setManufacturers] = useState([]);
 
   // State for selected items
   const [selectedItems, setSelectedItems] = useState([]);
@@ -22,54 +18,28 @@ const Model = () => {
   // State for modals
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [currentModel, setCurrentModel] = useState(null);
+  const [currentManufacturer, setCurrentManufacturer] = useState(null);
   
   // State for filters
   const [filterOpen, setFilterOpen] = useState(false);
-  const [filters, setFilters] = useState({
-    categoryID: '',
-    manufID: ''
-  });
 
-  // Fetch models, categories, and manufacturers on component mount
+  // Fetch manufacturers on component mount
   useEffect(() => {
-    fetchModels();
-    fetchCategories();
     fetchManufacturers();
   }, []);
 
-  // Fetch models from API
-  const fetchModels = async () => {
-    setLoading(true);
-    try {
-      const response = await axios.get('/api/models');
-      setModels(response.data);
-      setError(null);
-    } catch (err) {
-      console.error('Error fetching models:', err);
-      setError('Failed to load models. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Fetch categories for dropdown
-  const fetchCategories = async () => {
-    try {
-      const response = await axios.get('/api/categories');
-      setCategories(response.data);
-    } catch (err) {
-      console.error('Error fetching categories:', err);
-    }
-  };
-
-  // Fetch manufacturers for dropdown
+  // Fetch manufacturers from API
   const fetchManufacturers = async () => {
+    setLoading(true);
     try {
       const response = await axios.get('/api/manufacturers');
       setManufacturers(response.data);
+      setError(null);
     } catch (err) {
       console.error('Error fetching manufacturers:', err);
+      setError('Failed to load manufacturers. Please try again.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -84,106 +54,81 @@ const Model = () => {
 
   // Handle select all
   const handleSelectAll = () => {
-    if (selectedItems.length === filteredModels.length) {
+    if (selectedItems.length === filteredManufacturers.length) {
       setSelectedItems([]);
     } else {
-      setSelectedItems(filteredModels.map(model => model.modelID));
+      setSelectedItems(filteredManufacturers.map(manufacturer => manufacturer.manufID));
     }
   };
 
-  // Handle bulk model deletion
+  // Handle bulk manufacturer deletion
   const handleBulkDelete = async () => {
     if (!selectedItems.length) return;
     
-    if (window.confirm(`Are you sure you want to delete ${selectedItems.length} selected model(s)?`)) {
+    if (window.confirm(`Are you sure you want to delete ${selectedItems.length} selected manufacturer(s)?`)) {
       setLoading(true);
       try {
-        // Delete each selected model
+        // Delete each selected manufacturer
         await Promise.all(selectedItems.map(id => 
-          axios.delete(`/api/models/${id}`)
+          axios.delete(`/api/manufacturers/${id}`)
         ));
         
-        // Refresh models and clear selection
-        fetchModels();
+        // Refresh manufacturers and clear selection
+        fetchManufacturers();
         setSelectedItems([]);
       } catch (err) {
-        console.error('Error deleting models:', err);
-        setError('Failed to delete models. Please try again.');
+        console.error('Error deleting manufacturers:', err);
+        setError('Failed to delete manufacturers. Please try again.');
       } finally {
         setLoading(false);
       }
     }
   };
 
-  // Handle single model deletion
+  // Handle single manufacturer deletion
   const handleSingleDelete = async (id) => {
-    if (window.confirm('Are you sure you want to delete this model?')) {
+    if (window.confirm('Are you sure you want to delete this manufacturer?')) {
       setLoading(true);
       try {
-        await axios.delete(`/api/models/${id}`);
-        // Refresh models and remove from selected items if present
-        fetchModels();
+        await axios.delete(`/api/manufacturers/${id}`);
+        // Refresh manufacturers and remove from selected items if present
+        fetchManufacturers();
         setSelectedItems(selectedItems.filter(item => item !== id));
       } catch (err) {
-        console.error('Error deleting model:', err);
-        setError('Failed to delete model. Please try again.');
+        console.error('Error deleting manufacturer:', err);
+        setError('Failed to delete manufacturer. Please try again.');
       } finally {
         setLoading(false);
       }
     }
   };
 
-  // Handle edit model
-  const handleEdit = (model) => {
-    setCurrentModel(model);
+  // Handle edit manufacturer
+  const handleEdit = (manufacturer) => {
+    setCurrentManufacturer(manufacturer);
     setIsEditModalOpen(true);
-  };
-
-  // Handle filter change
-  const handleFilterChange = (e) => {
-    const { name, value } = e.target;
-    setFilters({
-      ...filters,
-      [name]: value
-    });
   };
 
   // Reset filters
   const resetFilters = () => {
-    setFilters({
-      categoryID: '',
-      manufID: ''
-    });
+    setSearchTerm('');
     setFilterOpen(false);
   };
 
-  // Filter models based on search and filters
-  const filteredModels = models.filter(model => {
-    // Search filter
-    const matchesSearch = (
-      model.modelName?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-    
-    // Category filter
-    const matchesCategory = filters.categoryID === '' || 
-      model.categoryID.toString() === filters.categoryID;
-    
-    // Manufacturer filter
-    const matchesManufacturer = filters.manufID === '' || 
-      model.manufID.toString() === filters.manufID;
-    
-    return matchesSearch && matchesCategory && matchesManufacturer;
+  // Filter manufacturers based on search
+  const filteredManufacturers = manufacturers.filter(manufacturer => {
+    return manufacturer.manufName?.toLowerCase().includes(searchTerm.toLowerCase());
   });
 
-  // Handle successful model addition
-  const handleModelAdded = (newModel) => {
-    setModels([newModel, ...models]);
+  // Handle successful manufacturer addition
+  const handleManufacturerAdded = (newManufacturer) => {
+    setManufacturers([newManufacturer, ...manufacturers]);
   };
 
-  // Handle successful model update
-  const handleModelUpdated = (updatedModel) => {
-    setModels(models.map(mod => 
-      mod.modelID === updatedModel.modelID ? updatedModel : mod
+  // Handle successful manufacturer update
+  const handleManufacturerUpdated = (updatedManufacturer) => {
+    setManufacturers(manufacturers.map(manu => 
+      manu.manufID === updatedManufacturer.manufID ? updatedManufacturer : manu
     ));
   };
 
@@ -193,18 +138,6 @@ const Model = () => {
     const date = new Date(dateString);
     const options = { year: 'numeric', month: 'short', day: 'numeric' };
     return date.toLocaleDateString('en-US', options);
-  };
-
-  // Get category name by ID
-  const getCategoryName = (categoryID) => {
-    const category = categories.find(cat => cat.categoryID === categoryID);
-    return category ? category.categoryName : 'N/A';
-  };
-
-  // Get manufacturer name by ID
-  const getManufacturerName = (manufID) => {
-    const manufacturer = manufacturers.find(manu => manu.manufID === manufID);
-    return manufacturer ? manufacturer.manufName : 'N/A';
   };
 
   return (
@@ -276,8 +209,8 @@ const Model = () => {
           <div className="h-px bg-[#273C45]"></div>
 
           <div className="p-2 space-y-1">
-            {/* Manufacturers */}
-            <div className="text-white flex items-center gap-2 p-2 hover:bg-[#1a3a4a] rounded">
+            {/* Manufacturers (Active) */}
+            <div className="bg-[#38b6ff] text-white rounded flex items-center gap-2 p-2">
               <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M22 12h-4l-3 9L9 3l-3 9H2"></path>
               </svg>
@@ -293,8 +226,8 @@ const Model = () => {
               <span>Categories</span>
             </div>
             
-            {/* Models (Active) */}
-            <div className="bg-[#38b6ff] text-white rounded flex items-center gap-2 p-2">
+            {/* Models */}
+            <div className="text-white flex items-center gap-2 p-2 hover:bg-[#1a3a4a] rounded">
               <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
                 <line x1="8" y1="21" x2="16" y2="21"></line>
@@ -357,12 +290,12 @@ const Model = () => {
       <main className="flex-1 p-6">
         {/* Title Bar Container */}
         <div className="flex justify-between items-center mb-6">
-          <h1 className="text-xl font-semibold">Models</h1>
+          <h1 className="text-xl font-semibold">Manufacturers</h1>
           <div className="flex gap-2 items-center">
             {/* Refresh Button */}
             <button 
               className="bg-[#13232c] border border-[#273C45] rounded-md w-8 h-8 flex items-center justify-center"
-              onClick={fetchModels}
+              onClick={fetchManufacturers}
             >
               <FaSyncAlt className="w-4 h-4" />
             </button>
@@ -426,41 +359,10 @@ const Model = () => {
                 Reset Filters
               </button>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              {/* Category Filter */}
+            <div className="grid grid-cols-1 gap-4">
+              {/* Additional filters can be added here */}
               <div>
-                <label className="block text-gray-400 text-sm mb-1">Category</label>
-                <select
-                  name="categoryID"
-                  value={filters.categoryID}
-                  onChange={handleFilterChange}
-                  className="w-full bg-[#1F3A45] rounded p-2"
-                >
-                  <option value="">All Categories</option>
-                  {categories.map(category => (
-                    <option key={category.categoryID} value={category.categoryID}>
-                      {category.categoryName}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Manufacturer Filter */}
-              <div>
-                <label className="block text-gray-400 text-sm mb-1">Manufacturer</label>
-                <select
-                  name="manufID"
-                  value={filters.manufID}
-                  onChange={handleFilterChange}
-                  className="w-full bg-[#1F3A45] rounded p-2"
-                >
-                  <option value="">All Manufacturers</option>
-                  {manufacturers.map(manufacturer => (
-                    <option key={manufacturer.manufID} value={manufacturer.manufID}>
-                      {manufacturer.manufName}
-                    </option>
-                  ))}
-                </select>
+                <p className="text-gray-400 text-sm">Use the search box to filter manufacturers by name.</p>
               </div>
             </div>
           </div>
@@ -483,60 +385,56 @@ const Model = () => {
         {/* Table */}
         <div className="bg-[#16282F] rounded-md overflow-hidden">
           {/* Table Header */}
-          <div className="bg-[#13232c] grid grid-cols-7 py-3 px-4 text-gray-300">
+          <div className="bg-[#13232c] grid grid-cols-5 py-3 px-4 text-gray-300">
             <div className="flex items-center">
               <input 
                 type="checkbox"
                 className="w-4 h-4 bg-transparent border-gray-600 accent-[#38b6ff]"
-                checked={selectedItems.length === filteredModels.length && filteredModels.length > 0}
+                checked={selectedItems.length === filteredManufacturers.length && filteredManufacturers.length > 0}
                 onChange={handleSelectAll}
-                disabled={filteredModels.length === 0}
+                disabled={filteredManufacturers.length === 0}
               />
             </div>
-            <div>Model ID</div>
-            <div>Model Name</div>
-            <div>Category</div>
-            <div>Manufacturer</div>
-            <div>Model Count</div>
+            <div>Manufacturer ID</div>
+            <div>Manufacturer Name</div>
+            <div>Manufacturer Count</div>
             <div className="text-center">Actions</div>
           </div>
           
           {/* Table Rows */}
-          {filteredModels.length === 0 ? (
+          {filteredManufacturers.length === 0 ? (
             <div className="py-4 px-4 text-center text-gray-400">
-              {loading ? 'Loading models...' : 'No models found.'}
+              {loading ? 'Loading manufacturers...' : 'No manufacturers found.'}
             </div>
           ) : (
-            filteredModels.map((model) => (
+            filteredManufacturers.map((manufacturer) => (
               <div 
-                key={model.modelID} 
-                className="grid grid-cols-7 py-3 px-4 border-b border-[#1e2d36] hover:bg-[#182a35] transition-colors"
+                key={manufacturer.manufID} 
+                className="grid grid-cols-5 py-3 px-4 border-b border-[#1e2d36] hover:bg-[#182a35] transition-colors"
               >
                 <div className="flex items-center">
                   <input
                     type="checkbox"
                     className="w-4 h-4 bg-transparent border-gray-600 accent-[#38b6ff]"
-                    checked={selectedItems.includes(model.modelID)}
-                    onChange={() => handleSelect(model.modelID)}
+                    checked={selectedItems.includes(manufacturer.manufID)}
+                    onChange={() => handleSelect(manufacturer.manufID)}
                   />
                 </div>
-                <div>{model.modelID.toString().padStart(2, '0')}</div>
-                <div>{model.modelName}</div>
-                <div>{getCategoryName(model.categoryID)}</div>
-                <div>{getManufacturerName(model.manufID)}</div>
-                <div>{model.modelCount}</div>
+                <div>{manufacturer.manufID.toString().padStart(2, '0')}</div>
+                <div>{manufacturer.manufName}</div>
+                <div>{manufacturer.manufacturerCount}</div>
                 <div className="flex items-center justify-center space-x-3">
                   <button 
-                    onClick={() => handleEdit(model)}
+                    onClick={() => handleEdit(manufacturer)}
                     className="text-[#38b6ff] hover:text-[#5bc2ff]"
-                    title="Edit model"
+                    title="Edit manufacturer"
                   >
                     <FaEdit className="w-4 h-4" />
                   </button>
                   <button 
-                    onClick={() => handleSingleDelete(model.modelID)}
+                    onClick={() => handleSingleDelete(manufacturer.manufID)}
                     className="text-[#ff3e4e] hover:text-[#ff6b78]"
-                    title="Delete model"
+                    title="Delete manufacturer"
                   >
                     <FaTrash className="w-4 h-4" />
                   </button>
@@ -547,28 +445,26 @@ const Model = () => {
         </div>
       </main>
 
-      {/* Add Model Modal */}
-      <AddModelModal 
+      {/* Add Manufacturer Modal */}
+      <AddManufacturerModal 
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
-        onSuccess={handleModelAdded}
-        categories={categories}
-        manufacturers={manufacturers}
+        onSuccess={handleManufacturerAdded}
       />
 
-      {/* Edit Model Modal */}
-      {currentModel && (
-        <EditModelModal 
+      {/* Edit Manufacturer Modal */}
+      {currentManufacturer && (
+        <EditManufacturerModal 
           isOpen={isEditModalOpen}
           onClose={() => setIsEditModalOpen(false)}
-          onSuccess={handleModelUpdated}
-          model={currentModel}
-          categories={categories}
-          manufacturers={manufacturers}
+          onSuccess={handleManufacturerUpdated}
+          manufacturer={currentManufacturer}
         />
       )}
     </div>
   );
 };
 
-export default Model;
+export default Manufacturer;
+
+

@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import axios from '../api';
 
-
-const AssignAssetModal = ({ isOpen, onClose, onSuccess, assetIds }) => {
+const AssignAssetModal = ({ isOpen, onClose, onSuccess, assetIds, employeeId = null }) => {
   const [employees, setEmployees] = useState([]);
   const [workstations, setWorkstations] = useState([]);
   const [selectedEmployee, setSelectedEmployee] = useState('');
@@ -12,6 +11,14 @@ const AssignAssetModal = ({ isOpen, onClose, onSuccess, assetIds }) => {
   const [error, setError] = useState(null);
   const [isCreatingWorkstation, setIsCreatingWorkstation] = useState(false);
   const [newWorkstationName, setNewWorkstationName] = useState('');
+
+  // Initialize with employee ID if provided (from AssetInventory)
+  useEffect(() => {
+    if (employeeId) {
+      setSelectedEmployee(employeeId);
+      fetchWorkstations(employeeId);
+    }
+  }, [employeeId]);
 
   useEffect(() => {
     if (isOpen && assetIds.length > 0) {
@@ -190,7 +197,10 @@ const AssignAssetModal = ({ isOpen, onClose, onSuccess, assetIds }) => {
                             }}
                           />
                         )}
-                        <span>{asset.assetName}</span>
+                        <div>
+                          <span className="font-medium">{asset.assetName}</span>
+                          <span className="text-gray-400 text-xs ml-2">Tag: {asset.assetTag}</span>
+                        </div>
                       </li>
                     ))}
                   </ul>
@@ -198,30 +208,32 @@ const AssignAssetModal = ({ isOpen, onClose, onSuccess, assetIds }) => {
               </div>
             </div>
             
-            {/* Employee Selection */}
-            <div className="mb-4">
-              <label className="block text-gray-400 text-sm mb-1">Assign to Employee</label>
-              <div className="relative">
-                <select
-                  value={selectedEmployee}
-                  onChange={handleEmployeeChange}
-                  className="w-full bg-[#1A3A4A] rounded p-2 pr-8 appearance-none"
-                  disabled={loading}
-                >
-                  <option value="">Select Employee</option>
-                  {employees.map(emp => (
-                    <option key={emp.empID} value={emp.empID}>
-                      {`${emp.empFirstName} ${emp.empLastName} (${emp.empUserName})`}
-                    </option>
-                  ))}
-                </select>
-                <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
-                  <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
-                  </svg>
+            {/* Employee Selection - Only show if not pre-selected */}
+            {!employeeId && (
+              <div className="mb-4">
+                <label className="block text-gray-400 text-sm mb-1">Assign to Employee</label>
+                <div className="relative">
+                  <select
+                    value={selectedEmployee}
+                    onChange={handleEmployeeChange}
+                    className="w-full bg-[#1A3A4A] rounded p-2 pr-8 appearance-none"
+                    disabled={loading}
+                  >
+                    <option value="">Select Employee</option>
+                    {employees.map(emp => (
+                      <option key={emp.empID} value={emp.empID}>
+                        {`${emp.empFirstName} ${emp.empLastName} (${emp.empUserName})`}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                    <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                    </svg>
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
             
             {/* Workstation Selection or Creation */}
             {selectedEmployee && (

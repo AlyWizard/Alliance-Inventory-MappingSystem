@@ -48,7 +48,9 @@ app.use(cors({
   credentials: true
 }));
 app.use(express.json());
-app.use(express.static('public')); // Serve static files from public directory
+// If your images are in /backend/public/uploads/assets
+app.use(express.static(path.join(__dirname, 'public')));
+
 
 app.get('/', (req, res) => {
   res.send('Backend is running! API is available at /api');
@@ -392,15 +394,18 @@ app.delete('/api/assets/:id', async (req, res) => {
 });
 
 // Upload image endpoint
+// Upload image endpoint
 app.post('/api/assets/upload-image', upload.single('image'), (req, res) => {
   if (!req.file) {
     return res.status(400).json({ error: 'No image file provided' });
   }
   
-  const imagePath = req.file.path.replace('public/', '');
+  // Extract just the filename and folder structure without the full path
+  const relativePath = req.file.path.substring(req.file.path.indexOf('uploads'));
+  
   res.json({
-    path: imagePath,
-    url: `${req.protocol}://${req.get('host')}/${imagePath}`
+    path: relativePath,
+    url: `${req.protocol}://${req.get('host')}/${relativePath}`
   });
 });
 
@@ -1209,6 +1214,536 @@ app.patch('/api/categories/:id/count', async (req, res) => {
     res.status(500).json({ error: 'Failed to update category count' });
   }
 });
+
+// ================== MANUFACTURER MANAGEMENT ROUTES ==================
+
+// Add these routes to your server.js file
+
+// Get all manufacturers
+app.get('/api/manufacturers', async (req, res) => {
+  try {
+    const [rows] = await db.query(`
+      SELECT * FROM manufacturers
+      ORDER BY manufID DESC
+    `);
+    res.json(rows);
+  } catch (error) {
+    console.error('Error fetching manufacturers:', error);
+    res.status(500).json({ error: 'Failed to fetch manufacturers' });
+  }
+});
+
+// Get manufacturer by ID
+app.get('/api/manufacturers/:id', async (req, res) => {
+  try {
+    const [rows] = await db.query(`
+      SELECT * FROM manufacturers
+      WHERE manufID = ?
+    `, [req.params.id]);
+    
+    if (rows.length === 0) {
+      res.status(404).json({ error: 'Manufacturer not found' });
+      return;
+    }
+    
+    res.json(rows[0]);
+  } catch (error) {
+    console.error('Error fetching manufacturer:', error);
+    res.status(500).json({ error: 'Failed to fetch manufacturer' });
+  }
+});
+
+// Create new manufacturer
+app.post('/api/manufacturers', async (req, res) => {
+  try {
+    const { 
+      manufName, 
+      manufacturerCount
+    } = req.body;
+    
+    // Check if manufacturer already exists
+    const [existingManuf] = await db.query(`
+      SELECT * FROM manufacturers WHERE manufName = ?
+    `, [manufName]);
+    
+    if (existingManuf.length > 0) {
+      return res.status(400).json({ 
+        errors: { manufName: 'Manufacturer with this name already exists' }
+      });
+    }
+    
+    // Insert new manufacturer
+    const [result] = await db.query(`
+      INSERT INTO manufacturers (
+        manufName, 
+        manufacturerCount,
+        created_at, 
+        updated_at
+      ) VALUES (?, ?, NOW(), NOW())
+    `, [
+      manufName, 
+      manufacturerCount || 0
+    ]);
+    
+    // Get the newly created manufacturer
+    const [newManufacturer] = await db.query(`
+      SELECT * FROM manufacturers
+      WHERE manufID = ?
+    `, [result.insertId]);
+    
+    res.status(201).json(newManufacturer[0]);
+  } catch (error) {
+    console.error('Error creating manufacturer:', error);
+    res.status(500).json({ 
+      error: 'Failed to create manufacturer',
+      message: error.message
+    });
+  }
+});
+
+// Update manufacturer
+app.put('/api/manufacturers/:id', async (req, res) => {
+  try {
+    const { 
+      manufName, 
+      manufacturerCount
+    } = req.body;
+    
+    // Check if manufacturer already exists (excluding current manufacturer)
+    if (manufName) {
+      const [existingManuf] = await db.query(`
+        SELECT * FROM manufacturers 
+        WHERE manufName = ? AND manufID != ?
+      `, [manufName, req.params.id]);
+      
+      if (existingManuf.length > 0) {
+        return res.status(400).json({ 
+          errors: { manufName: 'Manufacturer with this name already exists' }
+        });
+      }
+    }
+    
+    // Build dynamic update SQL
+    const updateFields = [];
+    const updateValues = [];
+    
+    if (manufName !== undefined) {
+      updateFields.push('manufName = ?');
+      updateValues.push(manufName);
+    }
+    
+    if (manufacturerCount !== undefined) {
+      updateFields.push('manufacturerCount = ?');
+      updateValues.push(manufacturerCount);
+    }
+    
+    // Always update the updated_at timestamp
+    updateFields.push('updated_at = NOW()');
+    
+    // Add the ID to the update values
+    updateValues.push(req.params.id);
+    
+    if (updateFields.length === 0) {
+      return res.status(400).json({ error: 'No fields to update' });
+    }
+    
+    // Update the manufacturer
+    await db.query(`
+      UPDATE manufacturers SET ${updateFields.join(', ')} WHERE manufID = ?
+    `, updateValues);
+    
+    // Get the updated manufacturer
+    const [updatedManufacturer] = await db.query(`
+      SELECT * FROM manufacturers
+      WHERE manufID = ?
+    `, [req.params.id]);
+    
+    if (updatedManufacturer.length === 0) {
+      return res.status(404).json({ error: 'Manufacturer not found' });
+    }
+    
+    res.json(updatedManufacturer[0]);
+  } catch (error) {
+    console.error('Error updating manufacturer:', error);
+    res.status(500).json({ error: 'Failed to update manufacturer' });
+  }
+});
+
+// Delete manufacturer
+app.delete('/api/manufacturers/:id', async (req, res) => {
+  try {
+    // Check if manufacturer exists
+    const [manufacturer] = await db.query(`
+      SELECT * FROM manufacturers WHERE manufID = ?
+    `, [req.params.id]);
+    
+    if (manufacturer.length === 0) {
+      return res.status(404).json({ error: 'Manufacturer not found' });
+    }
+    
+    // Check if manufacturer is referenced by any models
+    const [models] = await db.query(`
+      SELECT COUNT(*) as count FROM models WHERE manufID = ?
+    `, [req.params.id]);
+    
+    if (models[0].count > 0) {
+      return res.status(400).json({ 
+        error: 'Cannot delete manufacturer because it is referenced by one or more models'
+      });
+    }
+    
+    // Delete the manufacturer
+    await db.query(`
+      DELETE FROM manufacturers WHERE manufID = ?
+    `, [req.params.id]);
+    
+    res.status(204).send();
+  } catch (error) {
+    console.error('Error deleting manufacturer:', error);
+    res.status(500).json({ error: 'Failed to delete manufacturer' });
+  }
+});
+
+// Update manufacturer count (for when models get assigned to a manufacturer)
+app.patch('/api/manufacturers/:id/count', async (req, res) => {
+  try {
+    const { count } = req.body;
+    
+    if (count === undefined) {
+      return res.status(400).json({ error: 'Count is required' });
+    }
+    
+    // Update the manufacturer count
+    await db.query(`
+      UPDATE manufacturers 
+      SET manufacturerCount = ?, 
+          updated_at = NOW() 
+      WHERE manufID = ?
+    `, [count, req.params.id]);
+    
+    // Get the updated manufacturer
+    const [updatedManufacturer] = await db.query(`
+      SELECT * FROM manufacturers
+      WHERE manufID = ?
+    `, [req.params.id]);
+    
+    if (updatedManufacturer.length === 0) {
+      return res.status(404).json({ error: 'Manufacturer not found' });
+    }
+    
+    res.json(updatedManufacturer[0]);
+  } catch (error) {
+    console.error('Error updating manufacturer count:', error);
+    res.status(500).json({ error: 'Failed to update manufacturer count' });
+  }
+});
+
+// ================== MODEL MANAGEMENT ROUTES ==================
+
+// Add these routes to your server.js file
+
+// Get all models
+app.get('/api/models', async (req, res) => {
+  try {
+    const [rows] = await db.query(`
+      SELECT m.*, c.categoryName, mf.manufName
+      FROM models m
+      LEFT JOIN categories c ON m.categoryID = c.categoryID
+      LEFT JOIN manufacturers mf ON m.manufID = mf.manufID
+      ORDER BY m.modelID DESC
+    `);
+    res.json(rows);
+  } catch (error) {
+    console.error('Error fetching models:', error);
+    res.status(500).json({ error: 'Failed to fetch models' });
+  }
+});
+
+// Get model by ID
+app.get('/api/models/:id', async (req, res) => {
+  try {
+    const [rows] = await db.query(`
+      SELECT m.*, c.categoryName, mf.manufName
+      FROM models m
+      LEFT JOIN categories c ON m.categoryID = c.categoryID
+      LEFT JOIN manufacturers mf ON m.manufID = mf.manufID
+      WHERE m.modelID = ?
+    `, [req.params.id]);
+    
+    if (rows.length === 0) {
+      res.status(404).json({ error: 'Model not found' });
+      return;
+    }
+    
+    res.json(rows[0]);
+  } catch (error) {
+    console.error('Error fetching model:', error);
+    res.status(500).json({ error: 'Failed to fetch model' });
+  }
+});
+
+// Create new model
+app.post('/api/models', async (req, res) => {
+  try {
+    const { 
+      modelName, 
+      manufID,
+      categoryID,
+      modelCount
+    } = req.body;
+    
+    // Validate required fields
+    if (!modelName) {
+      return res.status(400).json({ errors: { modelName: 'Model name is required' } });
+    }
+    if (!manufID) {
+      return res.status(400).json({ errors: { manufID: 'Manufacturer ID is required' } });
+    }
+    if (!categoryID) {
+      return res.status(400).json({ errors: { categoryID: 'Category ID is required' } });
+    }
+    
+    // Check if model already exists
+    const [existingModels] = await db.query(`
+      SELECT * FROM models 
+      WHERE modelName = ? AND manufID = ? AND categoryID = ?
+    `, [modelName, manufID, categoryID]);
+    
+    if (existingModels.length > 0) {
+      return res.status(400).json({ 
+        errors: { modelName: 'Model with this name, manufacturer and category already exists' }
+      });
+    }
+    
+    // Insert new model
+    const [result] = await db.query(`
+      INSERT INTO models (
+        modelName, 
+        manufID,
+        categoryID,
+        modelCount,
+        created_at, 
+        updated_at
+      ) VALUES (?, ?, ?, ?, NOW(), NOW())
+    `, [
+      modelName, 
+      manufID,
+      categoryID,
+      modelCount || 0
+    ]);
+    
+    // Update manufacturer count
+    await updateManufacturerCount(manufID);
+    
+    // Update category count
+    await updateCategoryCount(categoryID);
+    
+    // Get the newly created model with related data
+    const [newModel] = await db.query(`
+      SELECT m.*, c.categoryName, mf.manufName
+      FROM models m
+      LEFT JOIN categories c ON m.categoryID = c.categoryID
+      LEFT JOIN manufacturers mf ON m.manufID = mf.manufID
+      WHERE m.modelID = ?
+    `, [result.insertId]);
+    
+    res.status(201).json(newModel[0]);
+  } catch (error) {
+    console.error('Error creating model:', error);
+    res.status(500).json({ 
+      error: 'Failed to create model',
+      message: error.message
+    });
+  }
+});
+
+// Update model
+app.put('/api/models/:id', async (req, res) => {
+  try {
+    const { 
+      modelName, 
+      manufID,
+      categoryID,
+      modelCount
+    } = req.body;
+    
+    // Get original model data for comparison
+    const [originalModel] = await db.query(`
+      SELECT * FROM models WHERE modelID = ?
+    `, [req.params.id]);
+    
+    if (originalModel.length === 0) {
+      return res.status(404).json({ error: 'Model not found' });
+    }
+    
+    const oldManufID = originalModel[0].manufID;
+    const oldCategoryID = originalModel[0].categoryID;
+    
+    // Check if model already exists (excluding current model)
+    if (modelName && manufID && categoryID) {
+      const [existingModels] = await db.query(`
+        SELECT * FROM models 
+        WHERE modelName = ? AND manufID = ? AND categoryID = ? AND modelID != ?
+      `, [modelName, manufID, categoryID, req.params.id]);
+      
+      if (existingModels.length > 0) {
+        return res.status(400).json({ 
+          errors: { modelName: 'Model with this name, manufacturer and category already exists' }
+        });
+      }
+    }
+    
+    // Build dynamic update SQL
+    const updateFields = [];
+    const updateValues = [];
+    
+    if (modelName !== undefined) {
+      updateFields.push('modelName = ?');
+      updateValues.push(modelName);
+    }
+    
+    if (manufID !== undefined) {
+      updateFields.push('manufID = ?');
+      updateValues.push(manufID);
+    }
+    
+    if (categoryID !== undefined) {
+      updateFields.push('categoryID = ?');
+      updateValues.push(categoryID);
+    }
+    
+    if (modelCount !== undefined) {
+      updateFields.push('modelCount = ?');
+      updateValues.push(modelCount);
+    }
+    
+    // Always update the updated_at timestamp
+    updateFields.push('updated_at = NOW()');
+    
+    // Add the ID to the update values
+    updateValues.push(req.params.id);
+    
+    if (updateFields.length === 0) {
+      return res.status(400).json({ error: 'No fields to update' });
+    }
+    
+    // Update the model
+    await db.query(`
+      UPDATE models SET ${updateFields.join(', ')} WHERE modelID = ?
+    `, updateValues);
+    
+    // If manufacturer changed, update counts for both old and new manufacturers
+    if (manufID !== undefined && manufID !== oldManufID) {
+      await updateManufacturerCount(manufID);
+      await updateManufacturerCount(oldManufID);
+    }
+    
+    // If category changed, update counts for both old and new categories
+    if (categoryID !== undefined && categoryID !== oldCategoryID) {
+      await updateCategoryCount(categoryID);
+      await updateCategoryCount(oldCategoryID);
+    }
+    
+    // Get the updated model with related data
+    const [updatedModel] = await db.query(`
+      SELECT m.*, c.categoryName, mf.manufName
+      FROM models m
+      LEFT JOIN categories c ON m.categoryID = c.categoryID
+      LEFT JOIN manufacturers mf ON m.manufID = mf.manufID
+      WHERE m.modelID = ?
+    `, [req.params.id]);
+    
+    if (updatedModel.length === 0) {
+      return res.status(404).json({ error: 'Model not found after update' });
+    }
+    
+    res.json(updatedModel[0]);
+  } catch (error) {
+    console.error('Error updating model:', error);
+    res.status(500).json({ error: 'Failed to update model' });
+  }
+});
+
+// Delete model
+app.delete('/api/models/:id', async (req, res) => {
+  try {
+    // Check if model exists
+    const [model] = await db.query(`
+      SELECT * FROM models WHERE modelID = ?
+    `, [req.params.id]);
+    
+    if (model.length === 0) {
+      return res.status(404).json({ error: 'Model not found' });
+    }
+    
+    const modelData = model[0];
+    
+    // Check if model is referenced by any assets
+    const [assets] = await db.query(`
+      SELECT COUNT(*) as count FROM assets WHERE modelID = ?
+    `, [req.params.id]);
+    
+    if (assets[0].count > 0) {
+      return res.status(400).json({ 
+        error: 'Cannot delete model because it is referenced by one or more assets'
+      });
+    }
+    
+    // Delete the model
+    await db.query(`
+      DELETE FROM models WHERE modelID = ?
+    `, [req.params.id]);
+    
+    // Update manufacturer count
+    await updateManufacturerCount(modelData.manufID);
+    
+    // Update category count
+    await updateCategoryCount(modelData.categoryID);
+    
+    res.status(204).send();
+  } catch (error) {
+    console.error('Error deleting model:', error);
+    res.status(500).json({ error: 'Failed to delete model' });
+  }
+});
+
+// Helper function to update manufacturer model count
+async function updateManufacturerCount(manufID) {
+  try {
+    // Count models with this manufacturer
+    const [result] = await db.query(`
+      SELECT COUNT(*) as count FROM models WHERE manufID = ?
+    `, [manufID]);
+    
+    // Update manufacturer count
+    await db.query(`
+      UPDATE manufacturers 
+      SET manufacturerCount = ?, updated_at = NOW() 
+      WHERE manufID = ?
+    `, [result[0].count, manufID]);
+  } catch (error) {
+    console.error('Error updating manufacturer count:', error);
+  }
+}
+
+// Helper function to update category model count
+async function updateCategoryCount(categoryID) {
+  try {
+    // Count models with this category
+    const [result] = await db.query(`
+      SELECT COUNT(*) as count FROM models WHERE categoryID = ?
+    `, [categoryID]);
+    
+    // Update category count
+    await db.query(`
+      UPDATE categories 
+      SET categoryCount = ?, updated_at = NOW() 
+      WHERE categoryID = ?
+    `, [result[0].count, categoryID]);
+  } catch (error) {
+    console.error('Error updating category count:', error);
+  }
+}
 
 // Start the server
 const PORT = process.env.PORT || 3001;
