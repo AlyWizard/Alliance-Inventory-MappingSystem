@@ -1,6 +1,6 @@
 // EditModelModal.jsx
 import React, { useState, useEffect } from 'react';
-import axios from '../api';
+import axios from '../../api';
 
 const EditModelModal = ({ isOpen, onClose, onSuccess, model, categories, manufacturers }) => {
   const [formData, setFormData] = useState({

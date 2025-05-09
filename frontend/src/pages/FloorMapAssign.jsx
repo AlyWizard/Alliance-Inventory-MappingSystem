@@ -1,3 +1,4 @@
+//File Location: frontend/src/pages/FloorMapAssign.jsx
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { FaSearch, FaSync, FaPlus, FaUserPlus, FaFileExport, FaTrash, FaExchangeAlt, FaArrowLeft, FaExclamationTriangle } from 'react-icons/fa';
@@ -5,7 +6,7 @@ import axios from '../api';
 import SelectAssetsModal from '../components/AssetInventoryModals/SelectAssetsModal';
 import TransferAssetModal from '../components/AssetInventoryModals/TransferAssetModal';
 
-const AssetInventory = () => {
+const FloorMapAssign = () => {
   // Get employee ID from URL params
   const { employeeId } = useParams();
   const navigate = useNavigate();
@@ -664,4 +665,4 @@ const AssetInventory = () => {
   );
 };
 
-export default AssetInventory;
+export default FloorMapAssign;

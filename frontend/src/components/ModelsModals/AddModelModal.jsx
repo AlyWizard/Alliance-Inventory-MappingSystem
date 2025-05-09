@@ -1,6 +1,6 @@
 // AddModelModal.jsx
 import React, { useState } from 'react';
-import axios from '../api';
+import axios from '../../api';
 
 const AddModelModal = ({ isOpen, onClose, onSuccess, categories, manufacturers }) => {
   const [formData, setFormData] = useState({

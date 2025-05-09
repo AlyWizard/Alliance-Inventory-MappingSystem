@@ -1,14 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { FaSearch, FaSyncAlt, FaPlus, FaFileExport, FaTrash, FaEdit, FaFilter } from 'react-icons/fa';
 import axios from '../api';
-import AddEmployeeModal from '../components/AddEmployeeModal';
-import EditEmployeeModal from '../components/EditEmployeeModal';
+import AddEmployeeModal from '../components/EmployeeModals/AddEmployeeModal';
+import EditEmployeeModal from '../components/EmployeeModals/EditEmployeeModal';
+import { useNavigate } from 'react-router-dom'; // bagong add
 
 const EmployeesInventory = () => {
   // State for employees data
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const navigate = useNavigate();  // bagong add
 
   // State for selected items
   const [selectedItems, setSelectedItems] = useState([]);
@@ -26,6 +28,11 @@ const EmployeesInventory = () => {
     status: ''
   });
 
+   // Add this function to handle navigation to the asset inventory
+   const navigateToEmployeeAssets = (employeeId) => {
+    navigate(`/employee-assets/${employeeId}`);
+  };
+  
   // Fetch departments for filters
   const [departments, setDepartments] = useState([]);
 
@@ -489,8 +496,9 @@ const EmployeesInventory = () => {
               <div 
                 key={employee.empID} 
                 className="grid grid-cols-8 py-3 px-4 border-b border-[#1e2d36] hover:bg-[#182a35] transition-colors"
+                onClick={() => navigateToEmployeeAssets(employee.empID)}
               >
-                <div className="flex items-center">
+                <div className="flex items-center" onClick={(e) => e.stopPropagation()}>
                   <input
                     type="checkbox"
                     className="w-4 h-4 bg-transparent border-gray-600 accent-[#38b6ff]"
@@ -510,16 +518,22 @@ const EmployeesInventory = () => {
                   </span>
                 </div>
                 <div>{formatDate(employee.created_at)}</div>
-                <div className="flex items-center justify-center space-x-3">
+                <div className="flex items-center justify-center space-x-3" onClick={(e) => e.stopPropagation()}>
                   <button 
-                    onClick={() => handleEdit(employee)}
-                    className="text-[#38b6ff] hover:text-[#5bc2ff]"
-                    title="Edit employee"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleEdit(employee);
+                      }}
+                      className="text-[#38b6ff] hover:text-[#5bc2ff]"
+                      title="Edit employee"
                   >
                     <FaEdit className="w-4 h-4" />
                   </button>
                   <button 
-                    onClick={() => handleSingleDelete(employee.empID)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleSingleDelete(employee.empID);
+                    }}
                     className="text-[#ff3e4e] hover:text-[#ff6b78]"
                     title="Delete employee"
                   >

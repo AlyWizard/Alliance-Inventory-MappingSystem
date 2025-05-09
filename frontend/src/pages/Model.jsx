@@ -2,8 +2,8 @@
 import React, { useState, useEffect } from 'react';
 import { FaSearch, FaSyncAlt, FaPlus, FaFileExport, FaTrash, FaEdit, FaFilter } from 'react-icons/fa';
 import axios from '../api';
-import AddModelModal from '../components/AddModelModal';
-import EditModelModal from '../components/EditModelModal';
+import AddModelModal from '../components/ModelsModals/AddModelModal';
+import EditModelModal from '../components/ModelsModals/EditModelModal';
 
 const Model = () => {
   // State for models data

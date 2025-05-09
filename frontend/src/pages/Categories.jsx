@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { FaSearch, FaSyncAlt, FaPlus, FaFileExport, FaTrash, FaEdit, FaFilter } from 'react-icons/fa';
 import axios from '../api';
-import AddCategoryModal from '../components/AddCategoryModal';
-import EditCategoryModal from '../components/EditCategoryModal';
+import AddCategoryModal from '../components/CategoriesModals/AddCategoryModal';
+import EditCategoryModal from '../components/CategoriesModals/EditCategoryModal';
 
 const Categories = () => {
   // State for categories data

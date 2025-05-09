@@ -1,15 +1,42 @@
-// AddManufacturerModal.jsx
-import React, { useState } from 'react';
-import axios from '../api';
+import React, { useState, useEffect } from 'react';
+import axios from '../../api';
 
-const AddManufacturerModal = ({ isOpen, onClose, onSuccess }) => {
+const EditCategoryModal = ({ isOpen, onClose, onSuccess, category }) => {
   const [formData, setFormData] = useState({
-    manufName: '',
-    manufacturerCount: 0,
+    categoryName: '',
+    categoryType: '',
+    categoryCount: 0,
   });
   
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
+
+  // Predefined category types - now removed since we're using text input
+  // const categoryTypes = [
+  //   'Computer',
+  //   'Laptop',
+  //   'Monitor',
+  //   'Peripheral',
+  //   'Networking',
+  //   'Storage',
+  //   'Mobile',
+  //   'Hardware',
+  //   'Software',
+  //   'Office Equipment',
+  //   'Furniture',
+  //   'Other'
+  // ];
+
+  // Update form data when category prop changes
+  useEffect(() => {
+    if (category) {
+      setFormData({
+        categoryName: category.categoryName || '',
+        categoryType: category.categoryType || '',
+        categoryCount: category.categoryCount || 0,
+      });
+    }
+  }, [category]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -30,7 +57,8 @@ const AddManufacturerModal = ({ isOpen, onClose, onSuccess }) => {
   const validateForm = () => {
     const newErrors = {};
     
-    if (!formData.manufName.trim()) newErrors.manufName = 'Manufacturer name is required';
+    if (!formData.categoryName.trim()) newErrors.categoryName = 'Category name is required';
+    if (!formData.categoryType.trim()) newErrors.categoryType = 'Category type is required';
     
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -46,36 +74,27 @@ const AddManufacturerModal = ({ isOpen, onClose, onSuccess }) => {
     try {
       // Prepare payload matching your database structure
       const payload = {
-        manufName: formData.manufName.trim(),
-        manufacturerCount: parseInt(formData.manufacturerCount) || 0,
-        created_at: new Date().toISOString().slice(0, 19).replace('T', ' '),
+        categoryName: formData.categoryName.trim(),
+        categoryType: formData.categoryType.trim(),
+        categoryCount: parseInt(formData.categoryCount) || 0,
         updated_at: new Date().toISOString().slice(0, 19).replace('T', ' ')
       };
       
-      const response = await axios.post('/api/manufacturers', payload);
+      const response = await axios.put(`/api/categories/${category.categoryID}`, payload);
       
       setLoading(false);
       onSuccess(response.data);
-      resetForm();
       onClose();
     } catch (error) {
       setLoading(false);
-      console.error('Error creating manufacturer:', error);
+      console.error('Error updating category:', error);
       
       if (error.response && error.response.data && error.response.data.errors) {
         setErrors(error.response.data.errors);
       } else {
-        setErrors({ general: 'Failed to create manufacturer. Please try again.' });
+        setErrors({ general: 'Failed to update category. Please try again.' });
       }
     }
-  };
-
-  const resetForm = () => {
-    setFormData({
-      manufName: '',
-      manufacturerCount: 0
-    });
-    setErrors({});
   };
 
   if (!isOpen) return null;
@@ -86,9 +105,10 @@ const AddManufacturerModal = ({ isOpen, onClose, onSuccess }) => {
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-semibold flex items-center">
             <svg className="w-6 h-6 mr-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M22 12h-4l-3 9L9 3l-3 9H2"></path>
+              <circle cx="12" cy="12" r="10"></circle>
+              <circle cx="12" cy="12" r="4"></circle>
             </svg>
-            Add Manufacturer
+            Edit Category
           </h2>
           <button 
             onClick={onClose}
@@ -101,31 +121,46 @@ const AddManufacturerModal = ({ isOpen, onClose, onSuccess }) => {
         </div>
         
         <form onSubmit={handleSubmit}>
-          {/* Manufacturer Name */}
+          {/* Category Name */}
           <div className="mb-4">
-            <label className="block text-gray-400 text-sm mb-1">Manufacturer Name</label>
+            <label className="block text-gray-400 text-sm mb-1">Category Name</label>
             <input
               type="text"
-              name="manufName"
-              value={formData.manufName}
+              name="categoryName"
+              value={formData.categoryName}
               onChange={handleChange}
-              className={`w-full bg-[#1F3A45] rounded p-2 ${errors.manufName ? 'border border-red-500' : ''}`}
-              placeholder="Enter manufacturer name"
+              className={`w-full bg-[#1F3A45] rounded p-2 ${errors.categoryName ? 'border border-red-500' : ''}`}
+              placeholder="Enter category name"
             />
-            {errors.manufName && <p className="text-red-500 text-xs mt-1">{errors.manufName}</p>}
+            {errors.categoryName && <p className="text-red-500 text-xs mt-1">{errors.categoryName}</p>}
           </div>
           
-          {/* Manufacturer Count */}
+          {/* Category Type - Now as text input */}
           <div className="mb-4">
-            <label className="block text-gray-400 text-sm mb-1">Manufacturer Count</label>
+            <label className="block text-gray-400 text-sm mb-1">Category Type</label>
+            <input
+              type="text"
+              name="categoryType"
+              value={formData.categoryType}
+              onChange={handleChange}
+              className={`w-full bg-[#1F3A45] rounded p-2 ${errors.categoryType ? 'border border-red-500' : ''}`}
+              placeholder="Enter category type"
+            />
+            {errors.categoryType && <p className="text-red-500 text-xs mt-1">{errors.categoryType}</p>}
+            <p className="text-gray-400 text-xs mt-1">This value will be reflected in the asset management system.</p>
+          </div>
+
+          {/* Category Count */}
+          <div className="mb-4">
+            <label className="block text-gray-400 text-sm mb-1">Category Count</label>
             <input
               type="number"
-              name="manufacturerCount"
-              value={formData.manufacturerCount}
+              name="categoryCount"
+              value={formData.categoryCount}
               onChange={handleChange}
               min="0"
               className="w-full bg-[#1F3A45] rounded p-2"
-              placeholder="Enter manufacturer count"
+              placeholder="Enter category count"
             />
           </div>
           
@@ -148,7 +183,7 @@ const AddManufacturerModal = ({ isOpen, onClose, onSuccess }) => {
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
-              ) : 'Add'}
+              ) : 'Update'}
             </button>
           </div>
         </form>
@@ -157,4 +192,4 @@ const AddManufacturerModal = ({ isOpen, onClose, onSuccess }) => {
   );
 };
 
-export default AddManufacturerModal;
+export default EditCategoryModal;

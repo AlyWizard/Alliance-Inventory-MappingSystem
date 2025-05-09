@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from '../api';
+import axios from '../../api';
 
 const AssignAssetModal = ({ isOpen, onClose, onSuccess, assetIds, employeeId = null }) => {
   const [employees, setEmployees] = useState([]);

@@ -1,4 +1,4 @@
-// Frontend/src/pages/Dashboard.jsx
+// frontend/src/pages/Dashboard.jsx
 import React, { useEffect, useState } from 'react';
 import AccountModal from '../components/modal/AccountCreation';
 import escLogo from '../assets/allianceLogo.png';

@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { FaSearch, FaSyncAlt, FaPlus, FaFileExport, FaTrash, FaEdit, FaFilter } from 'react-icons/fa';
 import axios from '../api';
-import AddAssetModal from '../components/AddAssetModal';
-import AssignAssetModal from '../components/AssignAssetModal';
-import EditAssetModal from '../components/EditAssetModal';
+import AddAssetModal from '../components/AssetModals/AddAssetModal';
+import AssignAssetModal from '../components/AssetModals/AssignAssetModal';
+import EditAssetModal from '../components/AssetModals/EditAssetModal';
 
 const Assets = () => {
   // State for assets data
@@ -106,32 +106,55 @@ const Assets = () => {
     }
   };
 
-  // Handle bulk asset deletion
+  // Handle bulk asset deletion with assignment check
   const handleBulkDelete = async () => {
     if (!selectedItems.length) return;
     
-    if (window.confirm(`Are you sure you want to delete ${selectedItems.length} selected asset(s)?`)) {
-      setLoading(true);
-      try {
-        // Delete each selected asset
-        await Promise.all(selectedItems.map(id => 
-          axios.delete(`/api/assets/${id}`)
-        ));
-        
-        // Refresh assets and clear selection
-        fetchAssets();
-        setSelectedItems([]);
-      } catch (err) {
-        console.error('Error deleting assets:', err);
-        setError('Failed to delete assets. Please try again.');
-      } finally {
-        setLoading(false);
+    try {
+      // Check if any selected assets are assigned
+      const assignedAssets = assets
+        .filter(asset => selectedItems.includes(asset.assetID) && asset.workStationID !== null);
+      
+      if (assignedAssets.length > 0) {
+        const assetNames = assignedAssets.map(asset => asset.assetName).join(', ');
+        setError(`Cannot delete assigned assets: ${assetNames}. Please unassign these assets first.`);
+        return;
       }
+      
+      if (window.confirm(`Are you sure you want to delete ${selectedItems.length} selected asset(s)?`)) {
+        setLoading(true);
+        try {
+          // Delete each selected asset
+          await Promise.all(selectedItems.map(id => 
+            axios.delete(`/api/assets/${id}`)
+          ));
+          
+          // Refresh assets and clear selection
+          fetchAssets();
+          setSelectedItems([]);
+        } catch (err) {
+          console.error('Error deleting assets:', err);
+          setError('Failed to delete assets. Please try again.');
+        } finally {
+          setLoading(false);
+        }
+      }
+    } catch (err) {
+      console.error('Error checking asset assignment status:', err);
+      setError('Failed to check asset assignment status. Please try again.');
     }
   };
 
   // Handle single asset deletion
   const handleSingleDelete = async (id) => {
+    // Get the asset to check if it's assigned
+    const asset = assets.find(a => a.assetID === id);
+    
+    if (asset && asset.workStationID !== null) {
+      setError(`Cannot delete assigned asset: ${asset.assetName}. Please unassign this asset first.`);
+      return;
+    }
+    
     if (window.confirm('Are you sure you want to delete this asset?')) {
       setLoading(true);
       try {
@@ -284,6 +307,20 @@ const Assets = () => {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+  };
+
+  // Check if selected assets are assignable (not already assigned)
+  const checkAssignableAssets = () => {
+    const assignedAssets = assets
+      .filter(asset => selectedItems.includes(asset.assetID) && asset.workStationID !== null);
+    
+    if (assignedAssets.length > 0) {
+      const assetNames = assignedAssets.map(asset => asset.assetName).join(', ');
+      setError(`Cannot assign these assets because they are already assigned: ${assetNames}. Please unassign these assets first.`);
+      return false;
+    }
+    
+    return true;
   };
 
   return (
@@ -460,7 +497,9 @@ const Assets = () => {
               className="bg-[#13232c] border border-[#273C45] rounded-md flex items-center gap-1.5 px-3 py-1 text-[#38b6ff]"
               onClick={() => {
                 if (selectedItems.length > 0) {
-                  setIsAssignModalOpen(true);
+                  if (checkAssignableAssets()) {
+                    setIsAssignModalOpen(true);
+                  }
                 } else {
                   alert("Please select at least one asset to assign");
                 }
@@ -641,7 +680,7 @@ const Assets = () => {
         {assets.length > 0 && (
           <div className="bg-[#16282F] rounded-md overflow-hidden">
             {/* Table Header */}
-            <div className="bg-[#13232c] grid grid-cols-9 py-3 px-4 text-gray-300">
+            <div className="bg-[#13232c] grid grid-cols-10 py-3 px-4 text-gray-300">
               <div className="flex items-center">
                 <input 
                   type="checkbox"
@@ -658,6 +697,7 @@ const Assets = () => {
               <div>Model</div>
               <div>Category</div>
               <div>Status</div>
+              <div>Assigned</div>
               <div className="text-center">Actions</div>
             </div>
             
@@ -670,7 +710,7 @@ const Assets = () => {
               filteredAssets.map((asset) => (
                 <div 
                   key={asset.assetID} 
-                  className="grid grid-cols-9 py-3 px-4 border-b border-[#1e2d36] hover:bg-[#182a35] transition-colors"
+                  className="grid grid-cols-10 py-3 px-4 border-b border-[#1e2d36] hover:bg-[#182a35] transition-colors"
                 >
                   <div className="flex items-center">
                     <input
@@ -680,29 +720,36 @@ const Assets = () => {
                       onChange={() => handleSelect(asset.assetID)}
                     />
                   </div>
-                  <div>{asset.assetName}</div>
                   <div>
-                  {asset.imagePath ? (
-                  <div className="w-10 h-10 rounded overflow-hidden bg-[#1F3A45] flex items-center justify-center">
-                  <img 
-                    src={`http://localhost:3001/uploads/assets/${asset.imagePath.split('\\').pop()}`} 
-                    alt={asset.assetName || "Asset"} 
-                    className="w-full h-full object-contain"
-                    onError={(e) => {
-                      console.log("Image failed to load:", asset.imagePath);
-                      e.target.style.display = 'none';
-                    }}
-                  />
-                </div>
-                    ) : (
-                      <div className="w-8 h-8 rounded bg-[#1F3A45] flex items-center justify-center">
-                        <svg className="w-4 h-4 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                          <circle cx="8.5" cy="8.5" r="1.5"></circle>
-                          <polyline points="21 15 16 10 5 21"></polyline>
-                        </svg>
+                    {asset.assetName}
+                    {asset.workStationID && asset.empFirstName && (
+                      <div className="text-xs text-gray-400 mt-1">
+                        Assigned to: {asset.empFirstName} {asset.empLastName}
                       </div>
                     )}
+                  </div>
+                  <div>
+                  {asset.imagePath ? (
+                    <div className="w-10 h-10 rounded overflow-hidden bg-[#1F3A45] flex items-center justify-center">
+                      <img 
+                        src={`http://localhost:3001/uploads/assets/${asset.imagePath.split('\\').pop()}`} 
+                        alt={asset.assetName || "Asset"} 
+                        className="w-full h-full object-contain"
+                        onError={(e) => {
+                          console.log("Image failed to load:", asset.imagePath);
+                          e.target.style.display = 'none';
+                        }}
+                      />
+                    </div>
+                  ) : (
+                    <div className="w-8 h-8 rounded bg-[#1F3A45] flex items-center justify-center">
+                      <svg className="w-4 h-4 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                        <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                        <polyline points="21 15 16 10 5 21"></polyline>
+                      </svg>
+                    </div>
+                  )}
                   </div>
                   <div>{asset.assetTag}</div>
                   <div>{asset.serialNo}</div>
@@ -711,6 +758,23 @@ const Assets = () => {
                   <div className="flex items-center gap-2">
                     <div className={`w-3 h-3 rounded-full ${getStatusColorClass(asset.assetStatus)}`}></div>
                     <span>{asset.assetStatus}</span>
+                  </div>
+                  <div className="flex items-center">
+                    {asset.workStationID ? (
+                      <div className="flex items-center text-green-400">
+                        <svg className="w-4 h-4 mr-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        <span>Yes</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center text-gray-400">
+                        <svg className="w-4 h-4 mr-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        <span>No</span>
+                      </div>
+                    )}
                   </div>
                   <div className="flex items-center justify-center space-x-3">
                     <button 
@@ -722,8 +786,9 @@ const Assets = () => {
                     </button>
                     <button 
                       onClick={() => handleSingleDelete(asset.assetID)}
-                      className="text-[#ff3e4e] hover:text-[#ff6b78]"
-                      title="Delete asset"
+                      className={`text-[#ff3e4e] hover:text-[#ff6b78] ${asset.workStationID !== null ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      title={asset.workStationID !== null ? "Cannot delete assigned asset" : "Delete asset"}
+                      disabled={asset.workStationID !== null}
                     >
                       <FaTrash className="w-4 h-4" />
                     </button>

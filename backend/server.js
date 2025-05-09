@@ -1745,6 +1745,881 @@ async function updateCategoryCount(categoryID) {
   }
 }
 
+// Get assets assigned to an employee
+app.get('/api/employees/:id/assets', async (req, res) => {
+  try {
+    const empId = req.params.id;
+    
+    // Find all workstations for the employee
+    const [workstations] = await db.query(`
+      SELECT workStationID FROM workstations WHERE empID = ?
+    `, [empId]);
+    
+    if (workstations.length === 0) {
+      // If no workstations, return empty array
+      return res.json([]);
+    }
+    
+    // Get IDs of all workstations
+    const workstationIds = workstations.map(ws => ws.workStationID);
+    
+    // Find all assets assigned to any of the employee's workstations
+    const [assets] = await db.query(`
+      SELECT a.*, c.categoryName, m.modelName, 
+             e.empFirstName, e.empLastName, e.empUserName,
+             w.modelName as workstationName
+      FROM assets a
+      LEFT JOIN categories c ON a.categoryID = c.categoryID
+      LEFT JOIN models m ON a.modelID = m.modelID
+      LEFT JOIN workstations w ON a.workStationID = w.workStationID
+      LEFT JOIN employees e ON w.empID = e.empID
+      WHERE a.workStationID IN (?)
+    `, [workstationIds]);
+    
+    res.json(assets);
+  } catch (error) {
+    console.error('Error fetching employee assets:', error);
+    res.status(500).json({ error: 'Failed to fetch employee assets' });
+  }
+});
+
+// Bulk update assets (for assigning/unassigning multiple assets at once)
+app.post('/api/assets/bulk-update', async (req, res) => {
+  try {
+    const { assetIds, updates } = req.body;
+    
+    if (!assetIds || !Array.isArray(assetIds) || assetIds.length === 0) {
+      return res.status(400).json({ error: 'Asset IDs are required' });
+    }
+    
+    if (!updates || typeof updates !== 'object') {
+      return res.status(400).json({ error: 'Updates object is required' });
+    }
+    
+    // Build dynamic update SQL
+    const updateFields = [];
+    const updateValues = [];
+    
+    if (updates.workStationID !== undefined) {
+      updateFields.push('workStationID = ?');
+      updateValues.push(updates.workStationID || null);
+    }
+    
+    if (updates.assetStatus !== undefined) {
+      updateFields.push('assetStatus = ?');
+      updateValues.push(updates.assetStatus);
+    }
+    
+    if (updates.isBorrowed !== undefined) {
+      updateFields.push('isBorrowed = ?');
+      updateValues.push(updates.isBorrowed ? 1 : 0);
+    }
+    
+    // Always update the updated_at timestamp
+    updateFields.push('updated_at = NOW()');
+    
+    if (updateFields.length === 0) {
+      return res.status(400).json({ error: 'No fields to update' });
+    }
+    
+    // Update all assets in the list
+    await db.query(`
+      UPDATE assets 
+      SET ${updateFields.join(', ')} 
+      WHERE assetID IN (?)
+    `, [...updateValues, assetIds]);
+    
+    // Get the updated assets
+    const [updatedAssets] = await db.query(`
+      SELECT a.*, c.categoryName, m.modelName,
+             e.empFirstName, e.empLastName, e.empUserName,
+             w.modelName as workstationName
+      FROM assets a
+      LEFT JOIN categories c ON a.categoryID = c.categoryID
+      LEFT JOIN models m ON a.modelID = m.modelID
+      LEFT JOIN workstations w ON a.workStationID = w.workStationID
+      LEFT JOIN employees e ON w.empID = e.empID
+      WHERE a.assetID IN (?)
+    `, [assetIds]);
+    
+    res.json(updatedAssets);
+  } catch (error) {
+    console.error('Error updating assets in bulk:', error);
+    res.status(500).json({ error: 'Failed to update assets in bulk' });
+  }
+});
+
+// Unassign assets (remove them from a workstation)
+app.post('/api/assets/unassign', async (req, res) => {
+  try {
+    const { assetIds } = req.body;
+    
+    if (!assetIds || !Array.isArray(assetIds) || assetIds.length === 0) {
+      return res.status(400).json({ error: 'Asset IDs are required' });
+    }
+    
+    // Update all assets in the list to remove workstation assignment
+    await db.query(`
+      UPDATE assets 
+      SET workStationID = NULL, 
+          assetStatus = 'Ready to Deploy',
+          updated_at = NOW() 
+      WHERE assetID IN (?)
+    `, [assetIds]);
+    
+    // Get the updated assets
+    const [updatedAssets] = await db.query(`
+      SELECT a.*, c.categoryName, m.modelName,
+             e.empFirstName, e.empLastName, e.empUserName,
+             w.modelName as workstationName
+      FROM assets a
+      LEFT JOIN categories c ON a.categoryID = c.categoryID
+      LEFT JOIN models m ON a.modelID = m.modelID
+      LEFT JOIN workstations w ON a.workStationID = w.workStationID
+      LEFT JOIN employees e ON w.empID = e.empID
+      WHERE a.assetID IN (?)
+    `, [assetIds]);
+    
+    res.json(updatedAssets);
+  } catch (error) {
+    console.error('Error unassigning assets:', error);
+    res.status(500).json({ error: 'Failed to unassign assets' });
+  }
+});
+
+// Get all available (unassigned) assets
+app.get('/api/assets/available', async (req, res) => {
+  try {
+    const [rows] = await db.query(`
+      SELECT a.*, c.categoryName, m.modelName, 
+             e.empFirstName, e.empLastName, e.empUserName,
+             w.modelName as workstationName
+      FROM assets a
+      LEFT JOIN categories c ON a.categoryID = c.categoryID
+      LEFT JOIN models m ON a.modelID = m.modelID
+      LEFT JOIN workstations w ON a.workStationID = w.workStationID
+      LEFT JOIN employees e ON w.empID = e.empID
+      WHERE a.workStationID IS NULL
+    `);
+    res.json(rows);
+  } catch (error) {
+    console.error('Error fetching available assets:', error);
+    res.status(500).json({ error: 'Failed to fetch available assets' });
+  }
+});
+
+// Transfer assets between workstations
+app.post('/api/assets/transfer', async (req, res) => {
+  try {
+    const { assetIds, fromWorkstationId, toWorkstationId, assetStatus } = req.body;
+    
+    if (!assetIds || !Array.isArray(assetIds) || assetIds.length === 0) {
+      return res.status(400).json({ error: 'Asset IDs are required' });
+    }
+    
+    if (!toWorkstationId) {
+      return res.status(400).json({ error: 'Destination workstation ID is required' });
+    }
+    
+    // Verify all assets are currently in the fromWorkstationId (if provided)
+    if (fromWorkstationId) {
+      const [assetsCheck] = await db.query(`
+        SELECT COUNT(*) as count
+        FROM assets 
+        WHERE assetID IN (?) AND workStationID = ?
+      `, [assetIds, fromWorkstationId]);
+      
+      if (assetsCheck[0].count !== assetIds.length) {
+        return res.status(400).json({ 
+          error: 'Some assets are not assigned to the specified source workstation'
+        });
+      }
+    }
+    
+    // Update all assets in the list to transfer to the new workstation
+    await db.query(`
+      UPDATE assets 
+      SET workStationID = ?, 
+          assetStatus = ?,
+          updated_at = NOW() 
+      WHERE assetID IN (?)
+    `, [toWorkstationId, assetStatus || 'Onsite', assetIds]);
+    
+    // Get the updated assets
+    const [updatedAssets] = await db.query(`
+      SELECT a.*, c.categoryName, m.modelName,
+             e.empFirstName, e.empLastName, e.empUserName,
+             w.modelName as workstationName
+      FROM assets a
+      LEFT JOIN categories c ON a.categoryID = c.categoryID
+      LEFT JOIN models m ON a.modelID = m.modelID
+      LEFT JOIN workstations w ON a.workStationID = w.workStationID
+      LEFT JOIN employees e ON w.empID = e.empID
+      WHERE a.assetID IN (?)
+    `, [assetIds]);
+    
+    res.json(updatedAssets);
+  } catch (error) {
+    console.error('Error transferring assets:', error);
+    res.status(500).json({ error: 'Failed to transfer assets' });
+  }
+});
+
+// Add these routes to your existing server.js file
+
+// Assign assets to a workstation
+app.post('/api/assets/assign', async (req, res) => {
+  try {
+    const { assetIds, workStationID, assetStatus } = req.body;
+    
+    if (!assetIds || !Array.isArray(assetIds) || assetIds.length === 0) {
+      return res.status(400).json({ error: 'Asset IDs are required' });
+    }
+    
+    if (!workStationID) {
+      return res.status(400).json({ error: 'Workstation ID is required' });
+    }
+    
+    // Check if the workstation exists
+    const [workstation] = await db.query(
+      'SELECT * FROM workstations WHERE workStationID = ?',
+      [workStationID]
+    );
+    
+    if (workstation.length === 0) {
+      return res.status(404).json({ error: 'Workstation not found' });
+    }
+    
+    // Check if any assets are already assigned
+    const [assignedAssets] = await db.query(
+      'SELECT * FROM assets WHERE assetID IN (?) AND workStationID IS NOT NULL',
+      [assetIds]
+    );
+    
+    if (assignedAssets.length > 0) {
+      return res.status(400).json({ 
+        error: 'Some assets are already assigned to other workstations',
+        assignedAssets: assignedAssets
+      });
+    }
+    
+    // Assign assets to the workstation
+    await db.query(
+      'UPDATE assets SET workStationID = ?, assetStatus = ?, updated_at = NOW() WHERE assetID IN (?)',
+      [workStationID, assetStatus || 'Onsite', assetIds]
+    );
+    
+    // Get the updated assets
+    const [updatedAssets] = await db.query(`
+      SELECT a.*, c.categoryName, m.modelName,
+             e.empFirstName, e.empLastName, e.empUserName,
+             w.modelName as workstationName
+      FROM assets a
+      LEFT JOIN categories c ON a.categoryID = c.categoryID
+      LEFT JOIN models m ON a.modelID = m.modelID
+      LEFT JOIN workstations w ON a.workStationID = w.workStationID
+      LEFT JOIN employees e ON w.empID = e.empID
+      WHERE a.assetID IN (?)
+    `, [assetIds]);
+    
+    res.json(updatedAssets);
+  } catch (error) {
+    console.error('Error assigning assets:', error);
+    res.status(500).json({ error: 'Failed to assign assets' });
+  }
+});
+
+// Unassign assets from their workstations
+app.post('/api/assets/unassign', async (req, res) => {
+  try {
+    const { assetIds } = req.body;
+    
+    if (!assetIds || !Array.isArray(assetIds) || assetIds.length === 0) {
+      return res.status(400).json({ error: 'Asset IDs are required' });
+    }
+    
+    // Unassign assets
+    await db.query(
+      'UPDATE assets SET workStationID = NULL, assetStatus = "Ready to Deploy", updated_at = NOW() WHERE assetID IN (?)',
+      [assetIds]
+    );
+    
+    // Get the updated assets
+    const [updatedAssets] = await db.query(`
+      SELECT a.*, c.categoryName, m.modelName
+      FROM assets a
+      LEFT JOIN categories c ON a.categoryID = c.categoryID
+      LEFT JOIN models m ON a.modelID = m.modelID
+      WHERE a.assetID IN (?)
+    `, [assetIds]);
+    
+    res.json(updatedAssets);
+  } catch (error) {
+    console.error('Error unassigning assets:', error);
+    res.status(500).json({ error: 'Failed to unassign assets' });
+  }
+});
+
+// Get workstations for an employee
+app.get('/api/employees/:id/workstations', async (req, res) => {
+  try {
+    const [workstations] = await db.query(
+      'SELECT * FROM workstations WHERE empID = ?',
+      [req.params.id]
+    );
+    
+    res.json(workstations);
+  } catch (error) {
+    console.error('Error fetching workstations:', error);
+    res.status(500).json({ error: 'Failed to fetch workstations' });
+  }
+});
+
+// Create a workstation
+app.post('/api/workstations', async (req, res) => {
+  try {
+    const { modelName, empID } = req.body;
+    
+    if (!modelName) {
+      return res.status(400).json({ error: 'Workstation name is required' });
+    }
+    
+    if (!empID) {
+      return res.status(400).json({ error: 'Employee ID is required' });
+    }
+    
+    // Check if employee exists
+    const [employee] = await db.query(
+      'SELECT * FROM employees WHERE empID = ?',
+      [empID]
+    );
+    
+    if (employee.length === 0) {
+      return res.status(404).json({ error: 'Employee not found' });
+    }
+    
+    // Create workstation
+    const [result] = await db.query(
+      'INSERT INTO workstations (modelName, empID, created_at, updated_at) VALUES (?, ?, NOW(), NOW())',
+      [modelName, empID]
+    );
+    
+    // Get the created workstation
+    const [workstation] = await db.query(
+      'SELECT * FROM workstations WHERE workStationID = ?',
+      [result.insertId]
+    );
+    
+    res.status(201).json(workstation[0]);
+  } catch (error) {
+    console.error('Error creating workstation:', error);
+    res.status(500).json({ error: 'Failed to create workstation' });
+  }
+});
+
+// =================== WORKSTATION MANAGEMENT ROUTES ===================
+
+// Get all workstations with related data
+app.get('/api/workstations', async (req, res) => {
+  try {
+    const [workstations] = await db.query(`
+      SELECT w.*, 
+             e.empFirstName, e.empLastName, e.empUserName, e.empDept,
+             (SELECT COUNT(*) FROM assets a WHERE a.workStationID = w.workStationID) as assetCount
+      FROM workstations w
+      LEFT JOIN employees e ON w.empID = e.empID
+      ORDER BY w.created_at DESC
+    `);
+    
+    res.json(workstations);
+  } catch (error) {
+    console.error('Error fetching workstations:', error);
+    res.status(500).json({ error: 'Failed to fetch workstations' });
+  }
+});
+
+// Get specific workstation by ID
+app.get('/api/workstations/:id', async (req, res) => {
+  try {
+    const [workstations] = await db.query(`
+      SELECT w.*, 
+             e.empFirstName, e.empLastName, e.empUserName, e.empDept,
+             (SELECT COUNT(*) FROM assets a WHERE a.workStationID = w.workStationID) as assetCount
+      FROM workstations w
+      LEFT JOIN employees e ON w.empID = e.empID
+      WHERE w.workStationID = ?
+    `, [req.params.id]);
+    
+    if (workstations.length === 0) {
+      return res.status(404).json({ error: 'Workstation not found' });
+    }
+    
+    res.json(workstations[0]);
+  } catch (error) {
+    console.error('Error fetching workstation:', error);
+    res.status(500).json({ error: 'Failed to fetch workstation' });
+  }
+});
+
+// Get assets assigned to a workstation
+app.get('/api/workstations/:id/assets', async (req, res) => {
+  try {
+    const [assets] = await db.query(`
+      SELECT a.*, c.categoryName, m.modelName
+      FROM assets a
+      LEFT JOIN categories c ON a.categoryID = c.categoryID
+      LEFT JOIN models m ON a.modelID = m.modelID
+      WHERE a.workStationID = ?
+    `, [req.params.id]);
+    
+    res.json(assets);
+  } catch (error) {
+    console.error('Error fetching workstation assets:', error);
+    res.status(500).json({ error: 'Failed to fetch workstation assets' });
+  }
+});
+
+// Create a new workstation
+app.post('/api/workstations', async (req, res) => {
+  try {
+    const { modelName, empID } = req.body;
+    
+    // Validate required fields
+    if (!modelName) {
+      return res.status(400).json({ error: 'Workstation name is required' });
+    }
+    
+    if (!empID) {
+      return res.status(400).json({ error: 'Employee ID is required' });
+    }
+    
+    // Check if employee exists
+    const [employees] = await db.query('SELECT * FROM employees WHERE empID = ?', [empID]);
+    if (employees.length === 0) {
+      return res.status(404).json({ error: 'Employee not found' });
+    }
+    
+    // Insert workstation
+    const [result] = await db.query(`
+      INSERT INTO workstations (modelName, empID, created_at, updated_at)
+      VALUES (?, ?, NOW(), NOW())
+    `, [modelName, empID]);
+    
+    // Get created workstation with related data
+    const [workstation] = await db.query(`
+      SELECT w.*, 
+             e.empFirstName, e.empLastName, e.empUserName, e.empDept,
+             0 as assetCount
+      FROM workstations w
+      LEFT JOIN employees e ON w.empID = e.empID
+      WHERE w.workStationID = ?
+    `, [result.insertId]);
+    
+    res.status(201).json(workstation[0]);
+  } catch (error) {
+    console.error('Error creating workstation:', error);
+    res.status(500).json({ error: 'Failed to create workstation' });
+  }
+});
+
+// Update a workstation
+app.put('/api/workstations/:id', async (req, res) => {
+  try {
+    const { modelName, empID } = req.body;
+    const workstationId = req.params.id;
+    
+    // Validate required fields
+    if (!modelName) {
+      return res.status(400).json({ error: 'Workstation name is required' });
+    }
+    
+    if (!empID) {
+      return res.status(400).json({ error: 'Employee ID is required' });
+    }
+    
+    // Check if workstation exists
+    const [workstations] = await db.query('SELECT * FROM workstations WHERE workStationID = ?', [workstationId]);
+    if (workstations.length === 0) {
+      return res.status(404).json({ error: 'Workstation not found' });
+    }
+    
+    const currentWorkstation = workstations[0];
+    
+    // Check if employee exists
+    const [employees] = await db.query('SELECT * FROM employees WHERE empID = ?', [empID]);
+    if (employees.length === 0) {
+      return res.status(404).json({ error: 'Employee not found' });
+    }
+    
+    // Update workstation
+    await db.query(`
+      UPDATE workstations
+      SET modelName = ?, empID = ?, updated_at = NOW()
+      WHERE workStationID = ?
+    `, [modelName, empID, workstationId]);
+    
+    // Get updated workstation with related data
+    const [updatedWorkstation] = await db.query(`
+      SELECT w.*, 
+             e.empFirstName, e.empLastName, e.empUserName, e.empDept,
+             (SELECT COUNT(*) FROM assets a WHERE a.workStationID = w.workStationID) as assetCount
+      FROM workstations w
+      LEFT JOIN employees e ON w.empID = e.empID
+      WHERE w.workStationID = ?
+    `, [workstationId]);
+    
+    res.json(updatedWorkstation[0]);
+  } catch (error) {
+    console.error('Error updating workstation:', error);
+    res.status(500).json({ error: 'Failed to update workstation' });
+  }
+});
+
+// Delete a workstation
+app.delete('/api/workstations/:id', async (req, res) => {
+  try {
+    const workstationId = req.params.id;
+    
+    // Check if workstation exists
+    const [workstations] = await db.query('SELECT * FROM workstations WHERE workStationID = ?', [workstationId]);
+    if (workstations.length === 0) {
+      return res.status(404).json({ error: 'Workstation not found' });
+    }
+    
+    // Check if workstation has assigned assets
+    const [assetCount] = await db.query('SELECT COUNT(*) as count FROM assets WHERE workStationID = ?', [workstationId]);
+    if (assetCount[0].count > 0) {
+      return res.status(400).json({ 
+        error: 'Cannot delete workstation with assigned assets. Please unassign all assets first.'
+      });
+    }
+    
+    // Delete workstation
+    await db.query('DELETE FROM workstations WHERE workStationID = ?', [workstationId]);
+    
+    res.status(204).send();
+  } catch (error) {
+    console.error('Error deleting workstation:', error);
+    res.status(500).json({ error: 'Failed to delete workstation' });
+  }
+});
+
+// Transfer assets between workstations
+app.post('/api/workstations/transfer-assets', async (req, res) => {
+  try {
+    const { assetIds, fromWorkstationId, toWorkstationId, assetStatus } = req.body;
+    
+    // Validate required fields
+    if (!assetIds || !Array.isArray(assetIds) || assetIds.length === 0) {
+      return res.status(400).json({ error: 'Asset IDs are required' });
+    }
+    
+    if (!toWorkstationId) {
+      return res.status(400).json({ error: 'Destination workstation ID is required' });
+    }
+    
+    // Check if destination workstation exists
+    const [toWorkstations] = await db.query('SELECT * FROM workstations WHERE workStationID = ?', [toWorkstationId]);
+    if (toWorkstations.length === 0) {
+      return res.status(404).json({ error: 'Destination workstation not found' });
+    }
+    
+    // If fromWorkstationId is provided, verify all assets are from that workstation
+    if (fromWorkstationId) {
+      const [assetCount] = await db.query(`
+        SELECT COUNT(*) as count
+        FROM assets
+        WHERE assetID IN (?) AND workStationID = ?
+      `, [assetIds, fromWorkstationId]);
+      
+      if (assetCount[0].count !== assetIds.length) {
+        return res.status(400).json({ 
+          error: 'Some assets are not assigned to the source workstation'
+        });
+      }
+    }
+    
+    // Update assets to new workstation
+    await db.query(`
+      UPDATE assets
+      SET workStationID = ?, 
+          assetStatus = ?,
+          updated_at = NOW()
+      WHERE assetID IN (?)
+    `, [toWorkstationId, assetStatus || 'Onsite', assetIds]);
+    
+    // Get updated assets
+    const [updatedAssets] = await db.query(`
+      SELECT a.*, c.categoryName, m.modelName,
+             e.empFirstName, e.empLastName, e.empUserName,
+             w.modelName as workstationName
+      FROM assets a
+      LEFT JOIN categories c ON a.categoryID = c.categoryID
+      LEFT JOIN models m ON a.modelID = m.modelID
+      LEFT JOIN workstations w ON a.workStationID = w.workStationID
+      LEFT JOIN employees e ON w.empID = e.empID
+      WHERE a.assetID IN (?)
+    `, [assetIds]);
+    
+    res.json(updatedAssets);
+  } catch (error) {
+    console.error('Error transferring assets:', error);
+    res.status(500).json({ error: 'Failed to transfer assets' });
+  }
+});
+
+
+// =================== WORKSTATION MANAGEMENT ROUTES ===================
+
+// Get all workstations with related data
+app.get('/api/workstations', async (req, res) => {
+  try {
+    const [workstations] = await db.query(`
+      SELECT w.*, 
+             e.empFirstName, e.empLastName, e.empUserName, e.empDept,
+             (SELECT COUNT(*) FROM assets a WHERE a.workStationID = w.workStationID) as assetCount
+      FROM workstations w
+      LEFT JOIN employees e ON w.empID = e.empID
+      ORDER BY w.created_at DESC
+    `);
+    
+    res.json(workstations);
+  } catch (error) {
+    console.error('Error fetching workstations:', error);
+    res.status(500).json({ error: 'Failed to fetch workstations' });
+  }
+});
+
+// Get specific workstation by ID
+app.get('/api/workstations/:id', async (req, res) => {
+  try {
+    const [workstations] = await db.query(`
+      SELECT w.*, 
+             e.empFirstName, e.empLastName, e.empUserName, e.empDept,
+             (SELECT COUNT(*) FROM assets a WHERE a.workStationID = w.workStationID) as assetCount
+      FROM workstations w
+      LEFT JOIN employees e ON w.empID = e.empID
+      WHERE w.workStationID = ?
+    `, [req.params.id]);
+    
+    if (workstations.length === 0) {
+      return res.status(404).json({ error: 'Workstation not found' });
+    }
+    
+    res.json(workstations[0]);
+  } catch (error) {
+    console.error('Error fetching workstation:', error);
+    res.status(500).json({ error: 'Failed to fetch workstation' });
+  }
+});
+
+// Get assets assigned to a workstation
+app.get('/api/workstations/:id/assets', async (req, res) => {
+  try {
+    const [assets] = await db.query(`
+      SELECT a.*, c.categoryName, m.modelName
+      FROM assets a
+      LEFT JOIN categories c ON a.categoryID = c.categoryID
+      LEFT JOIN models m ON a.modelID = m.modelID
+      WHERE a.workStationID = ?
+    `, [req.params.id]);
+    
+    res.json(assets);
+  } catch (error) {
+    console.error('Error fetching workstation assets:', error);
+    res.status(500).json({ error: 'Failed to fetch workstation assets' });
+  }
+});
+
+// Create a new workstation
+app.post('/api/workstations', async (req, res) => {
+  try {
+    const { modelName, empID } = req.body;
+    
+    // Validate required fields
+    if (!modelName) {
+      return res.status(400).json({ error: 'Workstation name is required' });
+    }
+    
+    if (!empID) {
+      return res.status(400).json({ error: 'Employee ID is required' });
+    }
+    
+    // Check if employee exists
+    const [employees] = await db.query('SELECT * FROM employees WHERE empID = ?', [empID]);
+    if (employees.length === 0) {
+      return res.status(404).json({ error: 'Employee not found' });
+    }
+    
+    // Insert workstation
+    const [result] = await db.query(`
+      INSERT INTO workstations (modelName, empID, created_at, updated_at)
+      VALUES (?, ?, NOW(), NOW())
+    `, [modelName, empID]);
+    
+    // Get created workstation with related data
+    const [workstation] = await db.query(`
+      SELECT w.*, 
+             e.empFirstName, e.empLastName, e.empUserName, e.empDept,
+             0 as assetCount
+      FROM workstations w
+      LEFT JOIN employees e ON w.empID = e.empID
+      WHERE w.workStationID = ?
+    `, [result.insertId]);
+    
+    res.status(201).json(workstation[0]);
+  } catch (error) {
+    console.error('Error creating workstation:', error);
+    res.status(500).json({ error: 'Failed to create workstation' });
+  }
+});
+
+// Update a workstation
+app.put('/api/workstations/:id', async (req, res) => {
+  try {
+    const { modelName, empID } = req.body;
+    const workstationId = req.params.id;
+    
+    // Validate required fields
+    if (!modelName) {
+      return res.status(400).json({ error: 'Workstation name is required' });
+    }
+    
+    if (!empID) {
+      return res.status(400).json({ error: 'Employee ID is required' });
+    }
+    
+    // Check if workstation exists
+    const [workstations] = await db.query('SELECT * FROM workstations WHERE workStationID = ?', [workstationId]);
+    if (workstations.length === 0) {
+      return res.status(404).json({ error: 'Workstation not found' });
+    }
+    
+    const currentWorkstation = workstations[0];
+    
+    // Check if employee exists
+    const [employees] = await db.query('SELECT * FROM employees WHERE empID = ?', [empID]);
+    if (employees.length === 0) {
+      return res.status(404).json({ error: 'Employee not found' });
+    }
+    
+    // Update workstation
+    await db.query(`
+      UPDATE workstations
+      SET modelName = ?, empID = ?, updated_at = NOW()
+      WHERE workStationID = ?
+    `, [modelName, empID, workstationId]);
+    
+    // Get updated workstation with related data
+    const [updatedWorkstation] = await db.query(`
+      SELECT w.*, 
+             e.empFirstName, e.empLastName, e.empUserName, e.empDept,
+             (SELECT COUNT(*) FROM assets a WHERE a.workStationID = w.workStationID) as assetCount
+      FROM workstations w
+      LEFT JOIN employees e ON w.empID = e.empID
+      WHERE w.workStationID = ?
+    `, [workstationId]);
+    
+    res.json(updatedWorkstation[0]);
+  } catch (error) {
+    console.error('Error updating workstation:', error);
+    res.status(500).json({ error: 'Failed to update workstation' });
+  }
+});
+
+// Delete a workstation
+app.delete('/api/workstations/:id', async (req, res) => {
+  try {
+    const workstationId = req.params.id;
+    
+    // Check if workstation exists
+    const [workstations] = await db.query('SELECT * FROM workstations WHERE workStationID = ?', [workstationId]);
+    if (workstations.length === 0) {
+      return res.status(404).json({ error: 'Workstation not found' });
+    }
+    
+    // Check if workstation has assigned assets
+    const [assetCount] = await db.query('SELECT COUNT(*) as count FROM assets WHERE workStationID = ?', [workstationId]);
+    if (assetCount[0].count > 0) {
+      return res.status(400).json({ 
+        error: 'Cannot delete workstation with assigned assets. Please unassign all assets first.'
+      });
+    }
+    
+    // Delete workstation
+    await db.query('DELETE FROM workstations WHERE workStationID = ?', [workstationId]);
+    
+    res.status(204).send();
+  } catch (error) {
+    console.error('Error deleting workstation:', error);
+    res.status(500).json({ error: 'Failed to delete workstation' });
+  }
+});
+
+// Transfer assets between workstations
+app.post('/api/workstations/transfer-assets', async (req, res) => {
+  try {
+    const { assetIds, fromWorkstationId, toWorkstationId, assetStatus } = req.body;
+    
+    // Validate required fields
+    if (!assetIds || !Array.isArray(assetIds) || assetIds.length === 0) {
+      return res.status(400).json({ error: 'Asset IDs are required' });
+    }
+    
+    if (!toWorkstationId) {
+      return res.status(400).json({ error: 'Destination workstation ID is required' });
+    }
+    
+    // Check if destination workstation exists
+    const [toWorkstations] = await db.query('SELECT * FROM workstations WHERE workStationID = ?', [toWorkstationId]);
+    if (toWorkstations.length === 0) {
+      return res.status(404).json({ error: 'Destination workstation not found' });
+    }
+    
+    // If fromWorkstationId is provided, verify all assets are from that workstation
+    if (fromWorkstationId) {
+      const [assetCount] = await db.query(`
+        SELECT COUNT(*) as count
+        FROM assets
+        WHERE assetID IN (?) AND workStationID = ?
+      `, [assetIds, fromWorkstationId]);
+      
+      if (assetCount[0].count !== assetIds.length) {
+        return res.status(400).json({ 
+          error: 'Some assets are not assigned to the source workstation'
+        });
+      }
+    }
+    
+    // Update assets to new workstation
+    await db.query(`
+      UPDATE assets
+      SET workStationID = ?, 
+          assetStatus = ?,
+          updated_at = NOW()
+      WHERE assetID IN (?)
+    `, [toWorkstationId, assetStatus || 'Onsite', assetIds]);
+    
+    // Get updated assets
+    const [updatedAssets] = await db.query(`
+      SELECT a.*, c.categoryName, m.modelName,
+             e.empFirstName, e.empLastName, e.empUserName,
+             w.modelName as workstationName
+      FROM assets a
+      LEFT JOIN categories c ON a.categoryID = c.categoryID
+      LEFT JOIN models m ON a.modelID = m.modelID
+      LEFT JOIN workstations w ON a.workStationID = w.workStationID
+      LEFT JOIN employees e ON w.empID = e.empID
+      WHERE a.assetID IN (?)
+    `, [assetIds]);
+    
+    res.json(updatedAssets);
+  } catch (error) {
+    console.error('Error transferring assets:', error);
+    res.status(500).json({ error: 'Failed to transfer assets' });
+  }
+});
+
 // Start the server
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {

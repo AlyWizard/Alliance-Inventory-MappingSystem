@@ -1,9 +1,7 @@
-//frontend/src/components/AddEmployeeModal.jsx
 import React, { useState, useEffect } from 'react';
-//import axios from 'axios';
-import axios from '../api';
+import axios from '../../api';
 
-const AddEmployeeModal = ({ isOpen, onClose, onSuccess }) => {
+const EditEmployeeModal = ({ isOpen, onClose, onSuccess, employee }) => {
   const [formData, setFormData] = useState({
     empFirstName: '',
     empLastName: '',
@@ -36,6 +34,19 @@ const AddEmployeeModal = ({ isOpen, onClose, onSuccess }) => {
     'Admin',
     'Training'
   ];
+
+  // Initialize form data when employee prop changes
+  useEffect(() => {
+    if (employee) {
+      setFormData({
+        empFirstName: employee.empFirstName || '',
+        empLastName: employee.empLastName || '',
+        empUserName: employee.empUserName || '',
+        empDept: employee.empDept || '',
+        employeeStatus: employee.employeeStatus || 'active'
+      });
+    }
+  }, [employee]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -73,63 +84,33 @@ const AddEmployeeModal = ({ isOpen, onClose, onSuccess }) => {
     setLoading(true);
     
     try {
-      // Prepare payload matching your database structure
+      // Prepare payload
       const payload = {
         empFirstName: formData.empFirstName.trim(),
         empLastName: formData.empLastName.trim(),
         empUserName: formData.empUserName.trim(),
         empDept: formData.empDept,
-        employeeCount: 0, // Default value as per your schema
-        employeeStatus: formData.employeeStatus,
-        created_at: new Date().toISOString().slice(0, 19).replace('T', ' '),
-        updated_at: new Date().toISOString().slice(0, 19).replace('T', ' ')
+        employeeStatus: formData.employeeStatus
       };
       
-      const response = await axios.post('/api/employees', payload);
+      const response = await axios.put(`/api/employees/${employee.empID}`, payload);
       
       setLoading(false);
       onSuccess(response.data);
-      resetForm();
       onClose();
     } catch (error) {
       setLoading(false);
-      console.error('Error creating employee:', error);
+      console.error('Error updating employee:', error);
       
       if (error.response && error.response.data && error.response.data.errors) {
         setErrors(error.response.data.errors);
       } else {
-        setErrors({ general: 'Failed to create employee. Please try again.' });
+        setErrors({ general: 'Failed to update employee. Please try again.' });
       }
     }
   };
 
-  const resetForm = () => {
-    setFormData({
-      empFirstName: '',
-      empLastName: '',
-      empUserName: '',
-      empDept: '',
-      employeeStatus: 'active'
-    });
-    setErrors({});
-  };
-
-  if (!isOpen) return null;
-
-  // Generate username suggestion based on first and last name
-  const suggestUsername = () => {
-    const first = formData.empFirstName.trim();
-    const last = formData.empLastName.trim();
-    
-    if (first && last) {
-      // First letter of first name + last name, all lowercase
-      const suggested = (first.charAt(0) + last).toLowerCase().replace(/\s/g, '');
-      setFormData({
-        ...formData,
-        empUserName: suggested
-      });
-    }
-  };
+  if (!isOpen || !employee) return null;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -137,10 +118,11 @@ const AddEmployeeModal = ({ isOpen, onClose, onSuccess }) => {
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-semibold flex items-center">
             <svg className="w-6 h-6 mr-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
-              <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>
+              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
             </svg>
-            Add Employee
+            Edit Employee
+            <span className="ml-2 text-sm text-gray-400">(ID: {employee.empID.toString().padStart(2, '0')})</span>
           </h2>
           <button 
             onClick={onClose}
@@ -162,7 +144,6 @@ const AddEmployeeModal = ({ isOpen, onClose, onSuccess }) => {
                 name="empFirstName"
                 value={formData.empFirstName}
                 onChange={handleChange}
-                onBlur={suggestUsername}
                 className={`w-full bg-[#1F3A45] rounded p-2 ${errors.empFirstName ? 'border border-red-500' : ''}`}
                 placeholder="Enter first name"
               />
@@ -177,7 +158,6 @@ const AddEmployeeModal = ({ isOpen, onClose, onSuccess }) => {
                 name="empLastName"
                 value={formData.empLastName}
                 onChange={handleChange}
-                onBlur={suggestUsername}
                 className={`w-full bg-[#1F3A45] rounded p-2 ${errors.empLastName ? 'border border-red-500' : ''}`}
                 placeholder="Enter last name"
               />
@@ -245,6 +225,15 @@ const AddEmployeeModal = ({ isOpen, onClose, onSuccess }) => {
               </div>
             </div>
           </div>
+
+          {/* Last Updated */}
+          <div className="mb-4">
+            <label className="block text-gray-400 text-sm mb-1">Last Updated</label>
+            <div className="w-full bg-[#1F3A45] rounded p-2 text-gray-300">
+              {employee.updated_at ? new Date(employee.updated_at).toLocaleString() : 'Not updated yet'}
+            </div>
+            <p className="text-gray-500 text-xs mt-1">This will be updated automatically when you save changes</p>
+          </div>
           
           {/* Error message */}
           {errors.general && (
@@ -265,7 +254,7 @@ const AddEmployeeModal = ({ isOpen, onClose, onSuccess }) => {
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
-              ) : 'Add'}
+              ) : 'Update'}
             </button>
           </div>
         </form>
@@ -274,4 +263,4 @@ const AddEmployeeModal = ({ isOpen, onClose, onSuccess }) => {
   );
 };
 
-export default AddEmployeeModal;
+export default EditEmployeeModal;

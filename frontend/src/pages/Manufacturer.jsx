@@ -2,8 +2,8 @@
 import React, { useState, useEffect } from 'react';
 import { FaSearch, FaSyncAlt, FaPlus, FaFileExport, FaTrash, FaEdit, FaFilter } from 'react-icons/fa';
 import axios from '../api';
-import AddManufacturerModal from '../components/AddManufacturerModal';
-import EditManufacturerModal from '../components/EditManufacturerModal';
+import AddManufacturerModal from '../components/ManufacturersModals/AddManufacturerModal';
+import EditManufacturerModal from '../components/ManufacturersModals/EditManufacturerModal';
 
 const Manufacturer = () => {
   // State for manufacturers data
