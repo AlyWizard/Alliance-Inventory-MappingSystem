@@ -13,6 +13,12 @@ import Workstation from './pages/Workstation';
 import React from 'react';
 //import EmployeeAssetInventory from './pages/AssetInventory'; // Import the new component
 import FloorMapAssign from './pages/FloorMapAssign';
+import ManageAssetModal from './components/ManageAssetsModal';
+import AssignEmployeeModal from './components/AssignEmployeeModal';
+
+
+
+
 
 
 
@@ -32,7 +38,11 @@ function App() {
         <Route path="/model" element={<Model />} />
         <Route path="/manufacturer" element={<Manufacturer />} />
         <Route path="/workstation" element={<Workstation />} />
-        <Route path="/floormap" element={<FloorMapAssign />} />xdetb
+        <Route path="/floormap" element={<FloorMapAssign />} />
+        <Route path="/manageasset" element={<ManageAssetModal />} />
+        <Route path="/assignemployee" element={<AssignEmployeeModal />} />
+
+
 
       </Routes>
     </Router>

@@ -127,7 +127,7 @@ const AssignAssetModal = ({ isOpen, onClose, onSuccess, assetIds, employeeId = n
         axios.put(`/api/assets/${assetId}`, {
           workStationID: selectedWorkstation,
           assetStatus: 'Onsite' // Update status to indicate assigned
-        })
+        }) 
       );
       
       const updatedAssets = await Promise.all(updatePromises);
