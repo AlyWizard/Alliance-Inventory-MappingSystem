@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { FaExclamationTriangle, FaUserAlt, FaLaptop, FaServer, FaUsers, FaArrowRight, FaCheckCircle, FaTimesCircle, FaSearch } from 'react-icons/fa';
+import { FaExclamationTriangle, FaUserAlt, FaLaptop, FaServer, FaUsers, FaArrowRight, FaCheckCircle, FaTimesCircle, FaSearch, FaInfoCircle } from 'react-icons/fa';
 
 const WorkstationAssignModal = ({ isOpen, onClose, workstationId }) => {
   const [employees, setEmployees] = useState([]);
@@ -17,6 +17,8 @@ const WorkstationAssignModal = ({ isOpen, onClose, workstationId }) => {
   const [isITEquipment, setIsITEquipment] = useState(false);
   const [statusMessage, setStatusMessage] = useState('');
   const [updateCompleted, setUpdateCompleted] = useState(false);
+  const [showUnassignOption, setShowUnassignOption] = useState(false);
+  const [currentAssignedWorkstation, setCurrentAssignedWorkstation] = useState(null);
 
   // Helper function to normalize workstation IDs for comparison
   const normalizeId = (id) => {
@@ -128,6 +130,18 @@ const WorkstationAssignModal = ({ isOpen, onClose, workstationId }) => {
       
       if (found) {
         console.log('Existing workstation found:', found);
+        
+        // Check if this workstation already has an employee assigned
+        if (found.empID) {
+          try {
+            const empResponse = await axios.get(`/api/employees/${found.empID}`);
+            const employeeName = `${empResponse.data.empFirstName} ${empResponse.data.empLastName}`;
+            setStatusMessage(`This workstation is currently assigned to ${employeeName}. Assigning a new employee will replace this assignment.`);
+          } catch (err) {
+            console.error('Error fetching employee details:', err);
+          }
+        }
+        
         setWorkstationData(found);
         setExistingWorkstation(true);
         
@@ -172,12 +186,7 @@ const WorkstationAssignModal = ({ isOpen, onClose, workstationId }) => {
     } catch (err) {
       console.error('Error fetching employees:', err);
       setError('Failed to load employees. Please try again.');
-      // Mock data for demo
-      setEmployees([
-        { empID: 9, empFirstName: 'Alyssa Marie', empLastName: 'Isuan' },
-        { empID: 10, empFirstName: 'Shandeloh', empLastName: 'Cayetano' },
-        { empID: 11, empFirstName: 'Leo', empLastName: 'Uchi' }
-      ]);
+      setEmployees([]);
     } finally {
       setLoading(false);
     }
@@ -199,12 +208,7 @@ const WorkstationAssignModal = ({ isOpen, onClose, workstationId }) => {
     } catch (err) {
       console.error('Error fetching available assets:', err);
       setLoading(false);
-      // Mock data for demo
-      setAvailableAssets([
-        { assetID: 1, assetName: 'Benq', categoryName: 'Device', assetTag: 'WSM-001' },
-        { assetID: 2, assetName: 'ProMax', categoryName: 'Device', assetTag: 'WSM-002' },
-        { assetID: 3, assetName: 'Benq', categoryName: 'Device', assetTag: 'WSM-003' }
-      ]);
+      setAvailableAssets([]);
     }
   };
 
@@ -241,19 +245,57 @@ const WorkstationAssignModal = ({ isOpen, onClose, workstationId }) => {
       
       // IMPORTANT: Check if this workstation already exists to prevent duplicates
       const response = await axios.get('/api/workstations');
-      const normalizedCurrentId = normalizeId(workstationId);
-      
+
+      // Use EXACT ID matching only - be very strict to prevent duplicates
       let existingWs = response.data.find(ws => 
         ws.modelName === workstationId || 
-        normalizeId(ws.modelName) === normalizedCurrentId
+        ws.workStationID?.toString() === workstationId
       );
-      
+
+      // If no exact match is found, log this to help debugging
+      if (!existingWs) {
+        console.log('No exact match found for workstation ID:', workstationId);
+      }
+
       if (existingWs && !existingWorkstation) {
         console.log('Found existing workstation that matches current ID:', existingWs);
         setWorkstationData(existingWs);
         setExistingWorkstation(true);
       }
       
+      // Check if selected employee is already assigned to another workstation
+      // An employee can only have one workstation
+// Check if selected employee is already assigned to another workstation
+      if (selectedEmployee) {
+        const empWorkstations = response.data.filter(ws => 
+          ws.empID && ws.empID.toString() === selectedEmployee.toString()
+        );
+        
+          // If employee already has a workstation that's not this one
+        if (empWorkstations.length > 0) {
+          const currentWsId = existingWorkstation ? workstationData.workStationID : 
+                              existingWs ? existingWs.workStationID : null;
+                              
+          const otherWorkstations = empWorkstations.filter(ws => 
+            currentWsId === null || ws.workStationID.toString() !== currentWsId.toString()
+          );
+          
+          if (otherWorkstations.length > 0) {
+            // Store the workstation information
+            setCurrentAssignedWorkstation(otherWorkstations[0]);
+            
+            // Show error message with specific workstation
+            setError(`Employee already assigned to workstation ${otherWorkstations[0].modelName}`);
+            
+            // Show the unassign option - make sure this is set to true
+            setShowUnassignOption(true);
+            setLoading(false);
+            return;
+          }
+        }
+      }
+      
+      // Now assign the employee to this workstation
       if (existingWorkstation || existingWs) {
         // If workstation already exists, update it
         const wsId = existingWs ? existingWs.workStationID : workstationData.workStationID;
@@ -264,7 +306,7 @@ const WorkstationAssignModal = ({ isOpen, onClose, workstationId }) => {
         console.log('Updated existing workstation');
         setSuccess('Employee assignment updated successfully');
       } else {
-        // If it's a new workstation, create it
+        // If it's a new workstation, create it with exact ID from SVG
         const createResponse = await axios.post('/api/workstations', {
           modelName: workstationId,
           empID: selectedEmployee
@@ -287,7 +329,53 @@ const WorkstationAssignModal = ({ isOpen, onClose, workstationId }) => {
       setLoading(false);
     }
   };
-
+  // Add this new function to your component
+  const handleUnassignAndReassign = async () => {
+    if (!currentAssignedWorkstation || !selectedEmployee) return;
+    
+    setLoading(true);
+    
+    try {
+      // Step 1: Unassign employee from their current workstation
+      await axios.put(`/api/workstations/${currentAssignedWorkstation.workStationID}`, {
+        empID: null, // Remove employee
+        modelName: currentAssignedWorkstation.modelName
+      });
+      
+      // Step 2: Hide the unassign option UI
+      setShowUnassignOption(false);
+      
+      // Step 3: Now try to assign to the new workstation
+      if (existingWorkstation || existingWs) {
+        const wsId = existingWorkstation ? workstationData.workStationID : existingWs.workStationID;
+        await axios.put(`/api/workstations/${wsId}`, {
+          empID: selectedEmployee,
+          modelName: workstationId
+        });
+        setSuccess('Employee reassigned successfully!');
+      } else {
+        // If it's a new workstation, create it
+        const createResponse = await axios.post('/api/workstations', {
+          modelName: workstationId,
+          empID: selectedEmployee
+        });
+        setWorkstationData(createResponse.data);
+        setExistingWorkstation(true);
+        setSuccess('Employee reassigned to new workstation!');
+      }
+      
+      // Step 4: Notify that workstation has been updated
+      notifyWorkstationUpdated();
+      
+      // Step 5: Move to assets tab after reassigning employee
+      setTab('assets');
+    } catch (err) {
+      console.error('Error during unassign and reassign:', err);
+      setError('Failed to reassign employee. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
   // Handle asset selection
   const handleAssetSelection = (assetId) => {
     if (selectedAssets.includes(assetId)) {
@@ -370,8 +458,19 @@ const WorkstationAssignModal = ({ isOpen, onClose, workstationId }) => {
       notifyWorkstationUpdated();
       
       setSuccess('Assets assigned successfully!');
+      
+      // Get employee info if available
+      const employeeId = workstationData?.empID || selectedEmployee;
+      
+      // Use a timeout so user can see the success message
       setTimeout(() => {
-        onClose(); // Close modal after successful assignment with a delay
+        if (employeeId) {
+          // Navigate to the employee asset inventory page if an employee is assigned
+          window.location.href = `/employee-assets/${employeeId}`;
+        } else {
+          // Otherwise just close the modal
+          onClose();
+        }
       }, 1500);
     } catch (err) {
       console.error('Error assigning assets:', err);
@@ -401,6 +500,16 @@ const WorkstationAssignModal = ({ isOpen, onClose, workstationId }) => {
       // Before closing, make sure we notify FloorMap of any changes
       if (existingWorkstation || workstationData?.workStationID) {
         notifyWorkstationUpdated();
+        
+        // If appropriate, navigate to employee assets or workstation details
+        if (workstationData?.workStationID && workstationData?.empID) {
+          // Use a timeout to ensure the event is processed
+          setTimeout(() => {
+            // Navigate to employee asset inventory if an employee is assigned
+            window.location.href = `/employee-assets/${workstationData.empID}`;
+          }, 300);
+          return;
+        }
       }
       onClose();
     }
@@ -415,9 +524,9 @@ const WorkstationAssignModal = ({ isOpen, onClose, workstationId }) => {
   // Filter assets based on search term
   const filteredAssets = availableAssets.filter(asset => {
     return (
-      asset.assetName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      asset.categoryName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      asset.assetTag.toLowerCase().includes(searchTerm.toLowerCase())
+      asset.assetName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      asset.categoryName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      asset.assetTag?.toLowerCase().includes(searchTerm.toLowerCase())
     );
   });
 
@@ -494,6 +603,29 @@ const WorkstationAssignModal = ({ isOpen, onClose, workstationId }) => {
             <div className="bg-red-500 bg-opacity-20 text-red-100 p-3 rounded mb-4 flex items-center gap-2">
               <FaExclamationTriangle className="text-red-300" />
               <span>{error}</span>
+            </div>
+          )}
+
+          {/* Unassign Option - add this right after the error message */}
+          {showUnassignOption && (
+            <div className="bg-yellow-500 bg-opacity-20 text-yellow-100 p-3 rounded mb-4">
+              <p className="mb-2">Would you like to unassign this employee from their current workstation and assign them to this one?</p>
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowUnassignOption(false)}
+                  className="px-3 py-1 bg-gray-600 hover:bg-gray-700 text-white rounded transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleUnassignAndReassign}
+                  className="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white rounded transition-colors"
+                >
+                  Unassign & Reassign
+                </button>
+              </div>
             </div>
           )}
           
@@ -680,7 +812,7 @@ const WorkstationAssignModal = ({ isOpen, onClose, workstationId }) => {
                 <button
                   type="button"
                   onClick={handleAssignAssets}
-                  className={`px-4 py-2 ${selectedAssets.length > 0 ? 'bg-[#38b6ff] hover:bg-[#2a9de2]' : 'bg-[#38b6ff] opacity-50 cursor-not-allowed'} text-white rounded transition-colors flex items-center gap-2`}
+                className={`px-4 py-2 ${selectedAssets.length > 0 ? 'bg-[#38b6ff] hover:bg-[#2a9de2]' : 'bg-[#38b6ff] opacity-50 cursor-not-allowed'} text-white rounded transition-colors flex items-center gap-2`}
                   disabled={loading || selectedAssets.length === 0}
                 >
                   <FaCheckCircle />
@@ -696,6 +828,3 @@ const WorkstationAssignModal = ({ isOpen, onClose, workstationId }) => {
 };
 
 export default WorkstationAssignModal;
-
-// Import at the top
-import { FaInfoCircle } from 'react-icons/fa';

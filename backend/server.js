@@ -2368,7 +2368,6 @@ app.post('/api/workstations/transfer-assets', async (req, res) => {
   }
 });
 
-
 // =================== WORKSTATION MANAGEMENT ROUTES ===================
 
 // Get all workstations with related data

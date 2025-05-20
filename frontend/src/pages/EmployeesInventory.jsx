@@ -213,7 +213,7 @@ const EmployeesInventory = () => {
 
         {/* Floor Mapping Container */}
         <div className="px-4 mb-6">
-          <div className="rounded-md border border-[#273C45] overflow-hidden">
+          <div className="rounded-md border border-[#273C45] overflow-hidden" onClick={() => window.location.href = '/dashboard'}>
             <button className="w-full py-3 px-4 bg-[#16282F] text-[#38b6ff] text-left">
               Floor Mapping
             </button>
@@ -264,7 +264,7 @@ const EmployeesInventory = () => {
 
           <div className="p-2 space-y-1">
             {/* Manufacturers */}
-            <div className="text-white flex items-center gap-2 p-2 hover:bg-[#1a3a4a] rounded">
+            <div className="text-white flex items-center gap-2 p-2 hover:bg-[#1a3a4a] rounded" onClick={() => window.location.href = '/manufacturer'}>
               <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M22 12h-4l-3 9L9 3l-3 9H2"></path>
               </svg>
@@ -272,7 +272,7 @@ const EmployeesInventory = () => {
             </div>
             
             {/* Categories */}
-            <div className="text-white flex items-center gap-2 p-2 hover:bg-[#1a3a4a] rounded">
+            <div className="text-white flex items-center gap-2 p-2 hover:bg-[#1a3a4a] rounded" onClick={() => window.location.href = '/categories'}>
               <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <circle cx="12" cy="12" r="10"></circle>
                 <circle cx="12" cy="12" r="4"></circle>
@@ -281,7 +281,7 @@ const EmployeesInventory = () => {
             </div>
             
             {/* Models */}
-            <div className="text-white flex items-center gap-2 p-2 hover:bg-[#1a3a4a] rounded">
+            <div className="text-white flex items-center gap-2 p-2 hover:bg-[#1a3a4a] rounded" onClick={() => window.location.href = '/model'}>
               <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
                 <line x1="8" y1="21" x2="16" y2="21"></line>
@@ -296,7 +296,7 @@ const EmployeesInventory = () => {
 
           <div className="p-2">
             {/* Assets */}
-            <div className="text-white flex items-center gap-2 p-2 hover:bg-[#1a3a4a] rounded">
+            <div className="text-white flex items-center gap-2 p-2 hover:bg-[#1a3a4a] rounded" onClick={() => window.location.href = '/assets'}>
               <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
                 <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>

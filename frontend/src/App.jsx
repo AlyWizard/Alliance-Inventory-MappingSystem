@@ -19,10 +19,6 @@ import AssignEmployeeModal from './components/AssignEmployeeModal';
 
 
 
-
-
-
-
 function App() {
   return (
     <Router>
@@ -41,9 +37,6 @@ function App() {
         <Route path="/floormap" element={<FloorMapAssign />} />
         <Route path="/manageasset" element={<ManageAssetModal />} />
         <Route path="/assignemployee" element={<AssignEmployeeModal />} />
-
-
-
       </Routes>
     </Router>
 

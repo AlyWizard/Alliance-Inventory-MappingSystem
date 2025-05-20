@@ -91,19 +91,19 @@ function Dashboard() {
                   <span className="text-gray-400">👤</span>
                   <span>Employees</span>
                 </div>
-                <div className="flex items-center gap-3 hover:bg-opacity-10 hover:bg-white p-2 rounded cursor-pointer">
+                <div className="flex items-center gap-3 hover:bg-opacity-10 hover:bg-white p-2 rounded cursor-pointer" onClick={() => window.location.href = '/manufacturer'}>
                   <span className="text-gray-400">🏭</span>
                   <span>Manufacturers</span>
                 </div>
-                <div className="flex items-center gap-3 hover:bg-opacity-10 hover:bg-white p-2 rounded cursor-pointer">
+                <div className="flex items-center gap-3 hover:bg-opacity-10 hover:bg-white p-2 rounded cursor-pointer" onClick={() => window.location.href = '/categories'}>
                   <span className="text-gray-400">🏷️</span>
                   <span>Categories</span>
                 </div>
-                <div className="flex items-center gap-3 hover:bg-opacity-10 hover:bg-white p-2 rounded cursor-pointer">
+                <div className="flex items-center gap-3 hover:bg-opacity-10 hover:bg-white p-2 rounded cursor-pointer" onClick={() => window.location.href = '/model'}>
                   <span className="text-gray-400">💻</span>
                   <span>Models</span>
                 </div>
-                <div className="flex items-center gap-3 hover:bg-opacity-10 hover:bg-white p-2 rounded cursor-pointer">
+                <div className="flex items-center gap-3 hover:bg-opacity-10 hover:bg-white p-2 rounded cursor-pointer" onClick={() => window.location.href = '/assets'}>
                   <span className="text-gray-400">📦</span>
                   <span>Assets</span>
                 </div>

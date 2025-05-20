@@ -159,7 +159,7 @@ const Manufacturer = () => {
 
         {/* Floor Mapping Container */}
         <div className="px-4 mb-6">
-          <div className="rounded-md border border-[#273C45] overflow-hidden">
+          <div className="rounded-md border border-[#273C45] overflow-hidden" onClick={() => window.location.href = '/dashboard'}>
             <button className="w-full py-3 px-4 bg-[#16282F] text-[#38b6ff] text-left">
               Floor Mapping
             </button>
@@ -176,7 +176,7 @@ const Manufacturer = () => {
           {/* Main Menu Items */}
           <div className="p-2 space-y-1">
             {/* Employees */}
-            <div className="text-white flex items-center gap-2 p-2 hover:bg-[#1a3a4a] rounded">
+            <div className="text-white flex items-center gap-2 p-2 hover:bg-[#1a3a4a] rounded" onClick={() => window.location.href = '/employees'}>
               <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
                 <path d="M17 2L12 7 7 2"></path>
@@ -218,7 +218,7 @@ const Manufacturer = () => {
             </div>
             
             {/* Categories */}
-            <div className="text-white flex items-center gap-2 p-2 hover:bg-[#1a3a4a] rounded">
+            <div className="text-white flex items-center gap-2 p-2 hover:bg-[#1a3a4a] rounded" onClick={() => window.location.href = '/categories'}>
               <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <circle cx="12" cy="12" r="10"></circle>
                 <circle cx="12" cy="12" r="4"></circle>
@@ -227,7 +227,7 @@ const Manufacturer = () => {
             </div>
             
             {/* Models */}
-            <div className="text-white flex items-center gap-2 p-2 hover:bg-[#1a3a4a] rounded">
+            <div className="text-white flex items-center gap-2 p-2 hover:bg-[#1a3a4a] rounded" onClick={() => window.location.href = '/model'}>
               <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
                 <line x1="8" y1="21" x2="16" y2="21"></line>

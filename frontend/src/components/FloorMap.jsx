@@ -195,85 +195,44 @@ const FloorMap = ({ forceMapUpdate }) => {
     
     // Helper function to find matching workstation
     const findMatchingWorkstation = (wsId) => {
-      // 1. Exact modelName match
-      let wsData = workstations.find(ws => ws.modelName === wsId);
-      if (wsData) return wsData;
-      
-      // 2. Case-insensitive modelName match
-      wsData = workstations.find(ws => 
-        ws.modelName && ws.modelName.toLowerCase() === wsId.toLowerCase()
-      );
-      if (wsData) return wsData;
-      
-      // 3. Match modelName but ignore dashes/spaces
-      const normalizedId = wsId.replace(/[- ]/g, '').toLowerCase();
-      wsData = workstations.find(ws => 
-        ws.modelName && ws.modelName.replace(/[- ]/g, '').toLowerCase() === normalizedId
-      );
-      if (wsData) return wsData;
-      
-      // 4. Extract numeric part if it starts with WSM, ASCL, etc.
-      if (wsId.match(/^(WSM|ASCL|STK)[- ]?(\d+)$/i)) {
-        const numericPart = wsId.replace(/^(WSM|ASCL|STK)[- ]?/i, '').replace(/^0+/, '');
-        
-        // Try to match by workstation ID
-        wsData = workstations.find(ws => ws.workStationID?.toString() === numericPart);
-        if (wsData) return wsData;
-        
-        // Try to match by numeric part in modelName
-        wsData = workstations.find(ws => 
-          ws.modelName && ws.modelName.match(/\d+/) && 
-          ws.modelName.match(/\d+/)[0] === numericPart
-        );
-        if (wsData) return wsData;
-      }
-      
-      // 5. Last resort - try to match by any number in the ID
-      if (wsId.match(/\d+/)) {
-        const numbers = wsId.match(/\d+/)[0];
-        wsData = workstations.find(ws => 
-          ws.modelName && ws.modelName.includes(numbers)
-        );
-        if (wsData) return wsData;
-      }
-      
-      // No match found
-      return null;
+      // 1. Exact modelName match ONLY - we want to be VERY strict
+      const wsData = workstations.find(ws => ws.modelName === wsId);
+      return wsData;
     };
-    
-    // Process each workstation
-    svgWorkstations.forEach(ws => {
-      const id = ws.getAttribute('data-cell-id');
-      if (!id) return;
-      
-      // Default color is RED (unassigned)
-      let color = colors.unassigned;
-      let isITEquipment = false;
-      
-      // IT Equipment is BLUE
-      if (id.startsWith('SVR') || id === 'SVR02' || id === 'SVR001' || 
-          id.startsWith('BR') || id === 'BR01' || id === 'WSM090') {
-        color = colors.it_equipment;
-        isITEquipment = true;
-      } else {
-        // Otherwise, check workstation status
-        const wsData = findMatchingWorkstation(id);
         
-        if (wsData) {
-          // Check status based on employee and assets
-          if (wsData.empID && wsData.assetCount > 0) {
-            // Complete - has both employee and assets
-            color = colors.complete;
-          } else if (wsData.empID || wsData.assetCount > 0) {
-            // Incomplete - has either employee or assets but not both
-            color = colors.incomplete;
+        // Process each workstation
+        svgWorkstations.forEach(ws => {
+          const id = ws.getAttribute('data-cell-id');
+          if (!id) return;
+          
+          // Default color is RED (unassigned)
+          let color = colors.unassigned;
+          let isITEquipment = false;
+          
+          // IT Equipment is BLUE
+          if (id.startsWith('SVR') || id === 'SVR02' || id === 'SVR001' || 
+              id.startsWith('BR') || id === 'BR01' || id === 'WSM090') {
+            color = colors.it_equipment;
+            isITEquipment = true;
           } else {
-            // Unassigned - has neither employee nor assets
-            color = colors.unassigned;
+            // Otherwise, check workstation status
+            const wsData = findMatchingWorkstation(id);
+            
+            if (wsData) {
+              // Check status based on employee and assets
+              if (wsData.empID && wsData.assetCount > 0) {
+                // Complete - has both employee and assets
+                color = colors.complete;
+              } else if (wsData.empID || wsData.assetCount > 0) {
+                // Incomplete - has either employee or assets but not both
+                color = colors.incomplete;
+              } else {
+                // Unassigned - has neither employee nor assets
+                color = colors.unassigned;
+              }
+            }
           }
-        }
-      }
-      
+          
       // Apply the color in multiple ways to ensure it works
       
       // Method 1: Set fill attribute
@@ -322,13 +281,22 @@ const FloorMap = ({ forceMapUpdate }) => {
         e.stopPropagation();
         console.log('Clicked: ' + id);
         
+      // Find if this workstation has an employee
+       const wsData = findMatchingWorkstation(id);
+  
+      if (wsData && wsData.empID) {
+     // If there's an employee assigned, go directly to employee assets page
+    window.location.href = `/employee-assets/${wsData.empID}`;
+   } else {
+    // Otherwise, show the modal to assign employee
         // For both IT equipment and regular workstations, show the modal 
         // (The modal will handle different workstation types)
         const event = new CustomEvent('showWorkstationModal', {
           detail: { workstationId: id }
         });
         window.dispatchEvent(event);
-      };
+      }
+    };
       
       // Add hover effect
       ws.onmouseenter = function() {

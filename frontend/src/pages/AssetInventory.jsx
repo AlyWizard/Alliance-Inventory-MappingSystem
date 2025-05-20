@@ -243,9 +243,24 @@ const AssetInventory = () => {
   );
 
   // Handle back button click
-  const handleBackToEmployees = () => {
+  //const handleBackToEmployees = () => {
+   // navigate('/employees');
+  //};
+  // Update the handleBackToEmployees function
+const handleBackToEmployees = () => {
+  // Check where we came from
+  if (location.state?.from) {
+    // If we have a "from" in state, go there
+    navigate(location.state.from);
+  } else if (document.referrer && document.referrer.includes(window.location.origin)) {
+    // Try to use the referrer as a fallback
+    const url = new URL(document.referrer);
+    navigate(url.pathname);
+  } else {
+    // Default fallback to employees
     navigate('/employees');
-  };
+  }
+};
 
   return (
     <div className="flex min-h-screen bg-[#0f1a1f] text-white font-sans">
