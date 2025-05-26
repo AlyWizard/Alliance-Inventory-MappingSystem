@@ -2619,6 +2619,398 @@ app.post('/api/workstations/transfer-assets', async (req, res) => {
   }
 });
 
+
+// ================== DEPARTMENT MANAGEMENT ROUTES ==================
+
+// Get all departments
+app.get('/api/departments', async (req, res) => {
+  try {
+    const [rows] = await db.query(`
+      SELECT d.*, c.compName
+      FROM departments d
+      LEFT JOIN companies c ON d.compID = c.compID
+      ORDER BY d.deptID DESC
+    `);
+    
+    if (rows.length === 0) {
+      const defaultDepartments = [
+        'IT', 'HR', 'Finance', 'Marketing', 'Operations',
+        'Alliance IT Department - Intern', 'Accounting', 'Broker Experience',
+        'Escalation', 'AU Accounts', 'PHD', 'Source', 'Data Entry',
+        'QA Packaging', 'Credit', 'Client Care', 'Admin', 'Training'
+      ];
+      
+      try {
+        for (const deptName of defaultDepartments) {
+          await db.query('INSERT INTO departments (deptName, compID) VALUES (?, ?)', [deptName, null]);
+        }
+        const [newRows] = await db.query(`
+          SELECT d.*, c.compName FROM departments d
+          LEFT JOIN companies c ON d.compID = c.compID
+          ORDER BY d.deptID DESC
+        `);
+        return res.json(newRows);
+      } catch (insertError) {
+        console.error('Error inserting default departments:', insertError);
+        return res.json(defaultDepartments.map((name, index) => ({
+          deptID: index + 1, deptName: name, compID: null, compName: null
+        })));
+      }
+    }
+    
+    res.json(rows);
+  } catch (error) {
+    console.error('Error fetching departments:', error);
+    res.status(500).json({ error: 'Failed to fetch departments' });
+  }
+});
+
+// Create new department
+app.post('/api/departments', async (req, res) => {
+  try {
+    const { deptName, compID } = req.body;
+    
+    if (!deptName || !deptName.trim()) {
+      return res.status(400).json({ 
+        errors: { deptName: 'Department name is required' }
+      });
+    }
+    
+    const [existingDepts] = await db.query('SELECT * FROM departments WHERE deptName = ?', [deptName.trim()]);
+    
+    if (existingDepts.length > 0) {
+      return res.status(400).json({ 
+        errors: { deptName: 'Department with this name already exists' }
+      });
+    }
+    
+    const [result] = await db.query(
+      'INSERT INTO departments (deptName, compID) VALUES (?, ?)',
+      [deptName.trim(), compID || null]
+    );
+    
+    const [newDepartment] = await db.query(`
+      SELECT d.*, c.compName FROM departments d
+      LEFT JOIN companies c ON d.compID = c.compID
+      WHERE d.deptID = ?
+    `, [result.insertId]);
+    
+    res.status(201).json(newDepartment[0]);
+  } catch (error) {
+    console.error('Error creating department:', error);
+    res.status(500).json({ error: 'Failed to create department' });
+  }
+});
+
+// Update department
+app.put('/api/departments/:id', async (req, res) => {
+  try {
+    const { deptName, compID } = req.body;
+    const deptID = req.params.id;
+    
+    if (!deptName || !deptName.trim()) {
+      return res.status(400).json({ 
+        errors: { deptName: 'Department name is required' }
+      });
+    }
+    
+    const [duplicateDepts] = await db.query(
+      'SELECT * FROM departments WHERE deptName = ? AND deptID != ?',
+      [deptName.trim(), deptID]
+    );
+    
+    if (duplicateDepts.length > 0) {
+      return res.status(400).json({ 
+        errors: { deptName: 'Department with this name already exists' }
+      });
+    }
+    
+    await db.query(
+      'UPDATE departments SET deptName = ?, compID = ? WHERE deptID = ?',
+      [deptName.trim(), compID || null, deptID]
+    );
+    
+    const [updatedDepartment] = await db.query(`
+      SELECT d.*, c.compName FROM departments d
+      LEFT JOIN companies c ON d.compID = c.compID
+      WHERE d.deptID = ?
+    `, [deptID]);
+    
+    res.json(updatedDepartment[0]);
+  } catch (error) {
+    console.error('Error updating department:', error);
+    res.status(500).json({ error: 'Failed to update department' });
+  }
+});
+
+// Delete department
+app.delete('/api/departments/:id', async (req, res) => {
+  try {
+    const deptID = req.params.id;
+    
+    const [department] = await db.query('SELECT * FROM departments WHERE deptID = ?', [deptID]);
+    
+    if (department.length === 0) {
+      return res.status(404).json({ error: 'Department not found' });
+    }
+    
+    const [employees] = await db.query(
+      'SELECT COUNT(*) as count FROM employees WHERE empDept = ?', 
+      [department[0].deptName]
+    );
+    
+    if (employees[0].count > 0) {
+      return res.status(400).json({ 
+        error: 'Cannot delete department because it is referenced by employees'
+      });
+    }
+    
+    await db.query('DELETE FROM departments WHERE deptID = ?', [deptID]);
+    
+    res.status(204).send();
+  } catch (error) {
+    console.error('Error deleting department:', error);
+    res.status(500).json({ error: 'Failed to delete department' });
+  }
+});
+
+// Get department names for dropdown
+app.get('/api/departments/list/names', async (req, res) => {
+  try {
+    const [rows] = await db.query('SELECT deptName FROM departments ORDER BY deptName ASC');
+    
+    if (rows.length === 0) {
+      const defaultDeptNames = [
+        'IT', 'HR', 'Finance', 'Marketing', 'Operations',
+        'Alliance IT Department - Intern', 'Accounting', 'Broker Experience',
+        'Escalation', 'AU Accounts', 'PHD', 'Source', 'Data Entry',
+        'QA Packaging', 'Credit', 'Client Care', 'Admin', 'Training'
+      ];
+      return res.json(defaultDeptNames);
+    }
+    
+    const departmentNames = rows.map(row => row.deptName);
+    res.json(departmentNames);
+  } catch (error) {
+    console.error('Error fetching department names:', error);
+    res.status(500).json({ error: 'Failed to fetch department names' });
+  }
+});
+
+// ================== ENHANCED COMPANY MANAGEMENT ROUTES ==================
+
+// Replace your existing company routes with these enhanced ones
+
+// Get all companies
+app.get('/api/companies', async (req, res) => {
+  try {
+    const [rows] = await db.query(`
+      SELECT c.*,
+             (SELECT COUNT(*) FROM departments WHERE compID = c.compID) as departmentCount
+      FROM companies c
+      ORDER BY c.compID DESC
+    `);
+    
+    res.json(rows);
+  } catch (error) {
+    console.error('Error fetching companies:', error);
+    res.status(500).json({ error: 'Failed to fetch companies' });
+  }
+});
+
+// Get company by ID
+app.get('/api/companies/:id', async (req, res) => {
+  try {
+    const [rows] = await db.query(`
+      SELECT c.*,
+             (SELECT COUNT(*) FROM departments WHERE compID = c.compID) as departmentCount
+      FROM companies c
+      WHERE c.compID = ?
+    `, [req.params.id]);
+    
+    if (rows.length === 0) {
+      res.status(404).json({ error: 'Company not found' });
+      return;
+    }
+    
+    res.json(rows[0]);
+  } catch (error) {
+    console.error('Error fetching company:', error);
+    res.status(500).json({ error: 'Failed to fetch company' });
+  }
+});
+
+// Create new company
+app.post('/api/companies', async (req, res) => {
+  try {
+    const { compName, compAddress } = req.body;
+    
+    // Validate required fields
+    if (!compName || !compName.trim()) {
+      return res.status(400).json({ 
+        errors: { compName: 'Company name is required' }
+      });
+    }
+    
+    // Check if company already exists
+    const [existingComps] = await db.query(`
+      SELECT * FROM companies WHERE compName = ?
+    `, [compName.trim()]);
+    
+    if (existingComps.length > 0) {
+      return res.status(400).json({ 
+        errors: { compName: 'Company with this name already exists' }
+      });
+    }
+    
+    // Insert new company
+    const [result] = await db.query(`
+      INSERT INTO companies (compName, compAddress)
+      VALUES (?, ?)
+    `, [compName.trim(), compAddress?.trim() || null]);
+    
+    // Get the newly created company with department count
+    const [newCompany] = await db.query(`
+      SELECT c.*,
+             (SELECT COUNT(*) FROM departments WHERE compID = c.compID) as departmentCount
+      FROM companies c
+      WHERE c.compID = ?
+    `, [result.insertId]);
+    
+    res.status(201).json(newCompany[0]);
+  } catch (error) {
+    console.error('Error creating company:', error);
+    res.status(500).json({ 
+      error: 'Failed to create company',
+      message: error.message
+    });
+  }
+});
+
+// Update company
+app.put('/api/companies/:id', async (req, res) => {
+  try {
+    const { compName, compAddress } = req.body;
+    const compID = req.params.id;
+    
+    // Validate required fields
+    if (!compName || !compName.trim()) {
+      return res.status(400).json({ 
+        errors: { compName: 'Company name is required' }
+      });
+    }
+    
+    // Check if company exists
+    const [existingComp] = await db.query(`
+      SELECT * FROM companies WHERE compID = ?
+    `, [compID]);
+    
+    if (existingComp.length === 0) {
+      return res.status(404).json({ error: 'Company not found' });
+    }
+    
+    // Check if company name already exists (excluding current company)
+    const [duplicateComps] = await db.query(`
+      SELECT * FROM companies 
+      WHERE compName = ? AND compID != ?
+    `, [compName.trim(), compID]);
+    
+    if (duplicateComps.length > 0) {
+      return res.status(400).json({ 
+        errors: { compName: 'Company with this name already exists' }
+      });
+    }
+    
+    // Update company
+    await db.query(`
+      UPDATE companies 
+      SET compName = ?, compAddress = ?
+      WHERE compID = ?
+    `, [compName.trim(), compAddress?.trim() || null, compID]);
+    
+    // Get the updated company with department count
+    const [updatedCompany] = await db.query(`
+      SELECT c.*,
+             (SELECT COUNT(*) FROM departments WHERE compID = c.compID) as departmentCount
+      FROM companies c
+      WHERE c.compID = ?
+    `, [compID]);
+    
+    res.json(updatedCompany[0]);
+  } catch (error) {
+    console.error('Error updating company:', error);
+    res.status(500).json({ error: 'Failed to update company' });
+  }
+});
+
+// Delete company
+app.delete('/api/companies/:id', async (req, res) => {
+  try {
+    const compID = req.params.id;
+    
+    // Check if company exists
+    const [company] = await db.query(`
+      SELECT * FROM companies WHERE compID = ?
+    `, [compID]);
+    
+    if (company.length === 0) {
+      return res.status(404).json({ error: 'Company not found' });
+    }
+    
+    // Check if company is referenced by any departments
+    const [departments] = await db.query(`
+      SELECT COUNT(*) as count FROM departments WHERE compID = ?
+    `, [compID]);
+    
+    if (departments[0].count > 0) {
+      return res.status(400).json({ 
+        error: 'Cannot delete company because it is referenced by one or more departments'
+      });
+    }
+    
+    // Delete the company
+    await db.query(`
+      DELETE FROM companies WHERE compID = ?
+    `, [compID]);
+    
+    res.status(204).send();
+  } catch (error) {
+    console.error('Error deleting company:', error);
+    res.status(500).json({ error: 'Failed to delete company' });
+  }
+});
+
+// Get companies for dropdown (returns just compName and compID for compatibility)
+app.get('/api/companies/list/dropdown', async (req, res) => {
+  try {
+    const [rows] = await db.query(`
+      SELECT compID, compName FROM companies ORDER BY compName ASC
+    `);
+    res.json(rows);
+  } catch (error) {
+    console.error('Error fetching company dropdown list:', error);
+    res.status(500).json({ error: 'Failed to fetch company list' });
+  }
+});
+
+// Get departments for a specific company
+app.get('/api/companies/:id/departments', async (req, res) => {
+  try {
+    const [departments] = await db.query(`
+      SELECT * FROM departments WHERE compID = ?
+      ORDER BY deptName ASC
+    `, [req.params.id]);
+    
+    res.json(departments);
+  } catch (error) {
+    console.error('Error fetching company departments:', error);
+    res.status(500).json({ error: 'Failed to fetch company departments' });
+  }
+});
+
+
+
+
 // Start the server
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {

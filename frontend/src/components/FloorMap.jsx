@@ -209,7 +209,7 @@ const FloorMap = ({ forceMapUpdate }) => {
           let color = colors.unassigned;
           let isITEquipment = false;
           
-          // IT Equipment is BLUE
+          // IT Equipment is BLUE  Add more here for ESC check Datacell id na naka embed sa floorMap
           if (id.startsWith('SVR') || id === 'SVR02' || id === 'SVR001' || 
               id.startsWith('BR') || id === 'BR01' || id === 'WSM090') {
             color = colors.it_equipment;

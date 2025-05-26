@@ -15,6 +15,9 @@ import React from 'react';
 import FloorMapAssign from './pages/FloorMapAssign';
 import ManageAssetModal from './components/ManageAssetsModal';
 import AssignEmployeeModal from './components/AssignEmployeeModal';
+import Departments from './pages/Department';
+import Company from './pages/Company';
+
 
 
 
@@ -37,6 +40,9 @@ function App() {
         <Route path="/floormap" element={<FloorMapAssign />} />
         <Route path="/manageasset" element={<ManageAssetModal />} />
         <Route path="/assignemployee" element={<AssignEmployeeModal />} />
+        <Route path="/department" element={<Departments />} />
+        <Route path="/company" element={<Company />} />
+
       </Routes>
     </Router>
 

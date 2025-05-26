@@ -12,7 +12,7 @@ const WorkstationInventory = () => {
     company: "Alliance"
   };
 
-  // Sample data for the table
+  // Sample data for the table 
   const [assets, setAssets] = useState([
     { id: 1, name: 'Microsoft 365', username: 'scayetano', department: 'IT', assigned: 6, dateAdded: 'Feb. 2, 2024' },
     { id: 2, name: 'BENQ', username: 'scayetano', department: 'IT', assigned: 6, dateAdded: 'Feb. 2, 2024' },

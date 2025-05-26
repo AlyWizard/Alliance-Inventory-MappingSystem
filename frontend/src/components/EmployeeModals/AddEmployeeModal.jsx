@@ -14,28 +14,32 @@ const AddEmployeeModal = ({ isOpen, onClose, onSuccess }) => {
   
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
+  const [departmentsList, setDepartmentsList] = useState([]);
+  const [departmentsLoading, setDepartmentsLoading] = useState(false);
 
-  // Predefined departments
-  const departmentsList = [
-    'IT',
-    'HR',
-    'Finance',
-    'Marketing',
-    'Operations',
-    'Alliance IT Department - Intern',
-    'Accounting',
-    'Broker Experience',
-    'Escalation',
-    'AU Accounts',
-    'PHD',
-    'Source',
-    'Data Entry',
-    'QA Packaging',
-    'Credit',
-    'Client Care',
-    'Admin',
-    'Training'
-  ];
+    useEffect(() => {
+    if (isOpen) {
+      fetchDepartments();
+    }
+  }, [isOpen]);
+
+  const fetchDepartments = async () => {
+    setDepartmentsLoading(true);
+    try {
+      const response = await axios.get('/api/departments/list/names');
+      setDepartmentsList(response.data);
+    } catch (error) {
+      console.error('Error fetching departments:', error);
+      setDepartmentsList([
+        'IT', 'HR', 'Finance', 'Marketing', 'Operations',
+        'Alliance IT Department - Intern', 'Accounting', 'Broker Experience',
+        'Escalation', 'AU Accounts', 'PHD', 'Source', 'Data Entry',
+        'QA Packaging', 'Credit', 'Client Care', 'Admin', 'Training'
+      ]);
+    } finally {
+      setDepartmentsLoading(false);
+    }
+  };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -44,7 +48,6 @@ const AddEmployeeModal = ({ isOpen, onClose, onSuccess }) => {
       [name]: value
     });
     
-    // Clear specific error when field is changed
     if (errors[name]) {
       setErrors({
         ...errors,
@@ -52,6 +55,7 @@ const AddEmployeeModal = ({ isOpen, onClose, onSuccess }) => {
       });
     }
   };
+
 
   const validateForm = () => {
     const newErrors = {};

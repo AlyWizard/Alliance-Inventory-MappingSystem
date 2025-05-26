@@ -12,28 +12,15 @@ const EditEmployeeModal = ({ isOpen, onClose, onSuccess, employee }) => {
   
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
+  const [departmentsList, setDepartmentsList] = useState([]);
+  const [departmentsLoading, setDepartmentsLoading] = useState(false);
 
-  // Predefined departments
-  const departmentsList = [
-    'IT',
-    'HR',
-    'Finance',
-    'Marketing',
-    'Operations',
-    'Alliance IT Department - Intern',
-    'Accounting',
-    'Broker Experience',
-    'Escalation',
-    'AU Accounts',
-    'PHD',
-    'Source',
-    'Data Entry',
-    'QA Packaging',
-    'Credit',
-    'Client Care',
-    'Admin',
-    'Training'
-  ];
+  // Fetch departments when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      fetchDepartments();
+    }
+  }, [isOpen]);
 
   // Initialize form data when employee prop changes
   useEffect(() => {
@@ -47,6 +34,21 @@ const EditEmployeeModal = ({ isOpen, onClose, onSuccess, employee }) => {
       });
     }
   }, [employee]);
+
+  // Fetch departments from API - ONLY admin-created departments
+  const fetchDepartments = async () => {
+    setDepartmentsLoading(true);
+    try {
+      const response = await axios.get('/api/departments/list/names');
+      setDepartmentsList(response.data);
+    } catch (error) {
+      console.error('Error fetching departments:', error);
+      setDepartmentsList([]); // Empty array if API fails
+      setErrors({ general: 'Failed to load departments. Please ensure departments are created first.' });
+    } finally {
+      setDepartmentsLoading(false);
+    }
+  };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -72,6 +74,11 @@ const EditEmployeeModal = ({ isOpen, onClose, onSuccess, employee }) => {
     if (!formData.empUserName.trim()) newErrors.empUserName = 'Username is required';
     if (!formData.empDept.trim()) newErrors.empDept = 'Department is required';
     
+    // Check if no departments available
+    if (departmentsList.length === 0) {
+      newErrors.empDept = 'No departments available. Please create departments first.';
+    }
+    
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -84,7 +91,6 @@ const EditEmployeeModal = ({ isOpen, onClose, onSuccess, employee }) => {
     setLoading(true);
     
     try {
-      // Prepare payload
       const payload = {
         empFirstName: formData.empFirstName.trim(),
         empLastName: formData.empLastName.trim(),
@@ -136,7 +142,6 @@ const EditEmployeeModal = ({ isOpen, onClose, onSuccess, employee }) => {
         
         <form onSubmit={handleSubmit}>
           <div className="grid grid-cols-2 gap-4 mb-4">
-            {/* Employee Name */}
             <div>
               <label className="block text-gray-400 text-sm mb-1">Employee Name</label>
               <input
@@ -150,7 +155,6 @@ const EditEmployeeModal = ({ isOpen, onClose, onSuccess, employee }) => {
               {errors.empFirstName && <p className="text-red-500 text-xs mt-1">{errors.empFirstName}</p>}
             </div>
             
-            {/* Last Name */}
             <div>
               <label className="block text-gray-400 text-sm mb-1">Last Name</label>
               <input
@@ -165,7 +169,6 @@ const EditEmployeeModal = ({ isOpen, onClose, onSuccess, employee }) => {
             </div>
           </div>
           
-          {/* Username */}
           <div className="mb-4">
             <label className="block text-gray-400 text-sm mb-1">Username</label>
             <input
@@ -179,7 +182,6 @@ const EditEmployeeModal = ({ isOpen, onClose, onSuccess, employee }) => {
             {errors.empUserName && <p className="text-red-500 text-xs mt-1">{errors.empUserName}</p>}
           </div>
           
-          {/* Department */}
           <div className="mb-4">
             <label className="block text-gray-400 text-sm mb-1">Department</label>
             <div className="relative">
@@ -188,8 +190,16 @@ const EditEmployeeModal = ({ isOpen, onClose, onSuccess, employee }) => {
                 value={formData.empDept}
                 onChange={handleChange}
                 className={`w-full bg-[#1F3A45] rounded p-2 pr-8 appearance-none ${errors.empDept ? 'border border-red-500' : ''}`}
+                disabled={departmentsLoading}
               >
-                <option value="">Select Department</option>
+                <option value="">
+                  {departmentsLoading 
+                    ? 'Loading departments...' 
+                    : departmentsList.length === 0 
+                    ? 'No departments available - Create departments first' 
+                    : 'Select Department'
+                  }
+                </option>
                 {departmentsList.map((dept, index) => (
                   <option key={index} value={dept}>
                     {dept}
@@ -197,15 +207,23 @@ const EditEmployeeModal = ({ isOpen, onClose, onSuccess, employee }) => {
                 ))}
               </select>
               <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
-                <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
-                </svg>
+                {departmentsLoading ? (
+                  <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-gray-400"></div>
+                ) : (
+                  <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                  </svg>
+                )}
               </div>
             </div>
             {errors.empDept && <p className="text-red-500 text-xs mt-1">{errors.empDept}</p>}
+            {departmentsList.length === 0 && !departmentsLoading && (
+              <p className="text-yellow-400 text-xs mt-1">
+                No departments found. Please go to the Departments page and create departments first.
+              </p>
+            )}
           </div>
           
-          {/* Status */}
           <div className="mb-4">
             <label className="block text-gray-400 text-sm mb-1">Status</label>
             <div className="relative">
@@ -226,7 +244,6 @@ const EditEmployeeModal = ({ isOpen, onClose, onSuccess, employee }) => {
             </div>
           </div>
 
-          {/* Last Updated */}
           <div className="mb-4">
             <label className="block text-gray-400 text-sm mb-1">Last Updated</label>
             <div className="w-full bg-[#1F3A45] rounded p-2 text-gray-300">
@@ -235,19 +252,17 @@ const EditEmployeeModal = ({ isOpen, onClose, onSuccess, employee }) => {
             <p className="text-gray-500 text-xs mt-1">This will be updated automatically when you save changes</p>
           </div>
           
-          {/* Error message */}
           {errors.general && (
             <div className="mb-4 p-2 bg-red-500 bg-opacity-20 rounded">
               <p className="text-red-400 text-sm">{errors.general}</p>
             </div>
           )}
           
-          {/* Submit Button */}
           <div className="flex justify-center mt-6">
             <button
               type="submit"
-              disabled={loading}
-              className="bg-[#0075A2] hover:bg-[#0088BC] text-white py-2 px-8 rounded-md transition-colors flex items-center justify-center min-w-[100px]"
+              disabled={loading || departmentsLoading || departmentsList.length === 0}
+              className="bg-[#0075A2] hover:bg-[#0088BC] text-white py-2 px-8 rounded-md transition-colors flex items-center justify-center min-w-[100px] disabled:opacity-50"
             >
               {loading ? (
                 <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
