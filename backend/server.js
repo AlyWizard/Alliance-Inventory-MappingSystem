@@ -3008,7 +3008,167 @@ app.get('/api/companies/:id/departments', async (req, res) => {
   }
 });
 
+// Add these new transfer endpoints to your server.js
 
+// Transfer assets between workstations
+app.post('/api/workstations/transfer-assets', async (req, res) => {
+  try {
+    const { assetIds, fromWorkstationId, toWorkstationId, assetStatus } = req.body;
+    
+    if (!assetIds || !Array.isArray(assetIds) || assetIds.length === 0) {
+      return res.status(400).json({ error: 'Asset IDs are required' });
+    }
+    
+    if (!toWorkstationId) {
+      return res.status(400).json({ error: 'Destination workstation ID is required' });
+    }
+    
+    // Update assets to new workstation
+    await db.query(`
+      UPDATE assets
+      SET workStationID = ?, 
+          assetStatus = ?,
+          updated_at = NOW()
+      WHERE assetID IN (?)
+    `, [toWorkstationId, assetStatus || 'Onsite', assetIds]);
+    
+    res.json({ message: 'Assets transferred successfully' });
+  } catch (error) {
+    console.error('Error transferring assets:', error);
+    res.status(500).json({ error: 'Failed to transfer assets' });
+  }
+});
+
+// Transfer employee between workstations
+app.post('/api/workstations/transfer-employee', async (req, res) => {
+  try {
+    const { currentEmployeeId, fromWorkstationId, toWorkstationId } = req.body;
+    
+    if (!currentEmployeeId) {
+      return res.status(400).json({ error: 'Current employee ID is required' });
+    }
+    
+    if (!toWorkstationId) {
+      return res.status(400).json({ error: 'Destination workstation ID is required' });
+    }
+    
+    // Check if destination workstation is occupied
+    const [destWorkstation] = await db.query(`
+      SELECT * FROM workstations WHERE workStationID = ?
+    `, [toWorkstationId]);
+    
+    if (destWorkstation.length === 0) {
+      return res.status(404).json({ error: 'Destination workstation not found' });
+    }
+    
+    // If destination is occupied, unassign the current occupant
+    if (destWorkstation[0].empID) {
+      await db.query(`
+        UPDATE workstations 
+        SET empID = NULL, updated_at = NOW()
+        WHERE empID = ?
+      `, [destWorkstation[0].empID]);
+    }
+    
+    // Unassign employee from current workstation
+    if (fromWorkstationId) {
+      await db.query(`
+        UPDATE workstations 
+        SET empID = NULL, updated_at = NOW()
+        WHERE workStationID = ?
+      `, [fromWorkstationId]);
+    }
+    
+    // Assign employee to destination workstation
+    await db.query(`
+      UPDATE workstations 
+      SET empID = ?, updated_at = NOW()
+      WHERE workStationID = ?
+    `, [currentEmployeeId, toWorkstationId]);
+    
+    res.json({ message: 'Employee transferred successfully' });
+  } catch (error) {
+    console.error('Error transferring employee:', error);
+    res.status(500).json({ error: 'Failed to transfer employee' });
+  }
+});
+
+// Transfer both employee and assets
+app.post('/api/workstations/transfer-both', async (req, res) => {
+  try {
+    const { currentEmployeeId, assetIds, fromWorkstationId, toWorkstationId, assetStatus } = req.body;
+    
+    if (!currentEmployeeId) {
+      return res.status(400).json({ error: 'Current employee ID is required' });
+    }
+    
+    if (!toWorkstationId) {
+      return res.status(400).json({ error: 'Destination workstation ID is required' });
+    }
+    
+    // Start transaction
+    await db.query('START TRANSACTION');
+    
+    try {
+      // Check if destination workstation is occupied
+      const [destWorkstation] = await db.query(`
+        SELECT * FROM workstations WHERE workStationID = ?
+      `, [toWorkstationId]);
+      
+      if (destWorkstation.length === 0) {
+        throw new Error('Destination workstation not found');
+      }
+      
+      // If destination is occupied, unassign the current occupant
+      if (destWorkstation[0].empID) {
+        await db.query(`
+          UPDATE workstations 
+          SET empID = NULL, updated_at = NOW()
+          WHERE empID = ?
+        `, [destWorkstation[0].empID]);
+      }
+      
+      // Unassign employee from current workstation
+      if (fromWorkstationId) {
+        await db.query(`
+          UPDATE workstations 
+          SET empID = NULL, updated_at = NOW()
+          WHERE workStationID = ?
+        `, [fromWorkstationId]);
+      }
+      
+      // Assign employee to destination workstation
+      await db.query(`
+        UPDATE workstations 
+        SET empID = ?, updated_at = NOW()
+        WHERE workStationID = ?
+      `, [currentEmployeeId, toWorkstationId]);
+      
+      // Transfer assets if provided
+      if (assetIds && assetIds.length > 0) {
+        await db.query(`
+          UPDATE assets
+          SET workStationID = ?, 
+              assetStatus = ?,
+              updated_at = NOW()
+          WHERE assetID IN (?)
+        `, [toWorkstationId, assetStatus || 'Onsite', assetIds]);
+      }
+      
+      // Commit transaction
+      await db.query('COMMIT');
+      
+      res.json({ message: 'Employee and assets transferred successfully' });
+    } catch (error) {
+      // Rollback transaction on error
+      await db.query('ROLLBACK');
+      throw error;
+    }
+  } catch (error) {
+    console.error('Error transferring employee and assets:', error);
+    res.status(500).json({ error: 'Failed to transfer employee and assets' });
+  }
+});
 
 
 // Start the server

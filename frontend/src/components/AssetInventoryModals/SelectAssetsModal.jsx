@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FaSearch, FaPlus, FaExclamationTriangle, FaFilter } from 'react-icons/fa';
+import { FaSearch, FaExclamationTriangle, FaFilter } from 'react-icons/fa';
 import axios from '../../api';
 
 const SelectAssetsModal = ({ isOpen, onClose, employeeId, onSuccess }) => {
@@ -10,14 +10,6 @@ const SelectAssetsModal = ({ isOpen, onClose, employeeId, onSuccess }) => {
   
   // State for selected assets
   const [selectedAssets, setSelectedAssets] = useState([]);
-  
-  // State for workstations
-  const [workstations, setWorkstations] = useState([]);
-  const [selectedWorkstation, setSelectedWorkstation] = useState('');
-  
-  // State for creating a new workstation
-  const [isCreatingWorkstation, setIsCreatingWorkstation] = useState(false);
-  const [newWorkstationName, setNewWorkstationName] = useState('');
   
   // State for search and filters
   const [searchTerm, setSearchTerm] = useState('');
@@ -49,7 +41,6 @@ const SelectAssetsModal = ({ isOpen, onClose, employeeId, onSuccess }) => {
   useEffect(() => {
     if (isOpen) {
       fetchAvailableAssets();
-      fetchWorkstations();
       fetchCategories();
       fetchModels();
     } else {
@@ -104,55 +95,6 @@ const SelectAssetsModal = ({ isOpen, onClose, employeeId, onSuccess }) => {
     }
   };
   
-  // Fetch workstations for the employee
-  const fetchWorkstations = async () => {
-    try {
-      const response = await axios.get(`/api/employees/${employeeId}/workstations`);
-      setWorkstations(response.data);
-      
-      // Set the first workstation as selected by default if available
-      if (response.data.length > 0) {
-        setSelectedWorkstation(response.data[0].workStationID);
-      } else {
-        setSelectedWorkstation('');
-      }
-    } catch (err) {
-      console.error('Error fetching workstations:', err);
-      setWorkstations([]);
-      setSelectedWorkstation('');
-    }
-  };
-  
-  // Handle creating a new workstation
-  const handleCreateWorkstation = async () => {
-    if (!newWorkstationName.trim()) {
-      setError('Please enter a workstation name');
-      return;
-    }
-    
-    setLoading(true);
-    try {
-      const response = await axios.post('/api/workstations', {
-        modelName: newWorkstationName,
-        empID: employeeId
-      });
-      
-      // Add the new workstation to the list and select it
-      setWorkstations([...workstations, response.data]);
-      setSelectedWorkstation(response.data.workStationID);
-      
-      // Reset the form
-      setNewWorkstationName('');
-      setIsCreatingWorkstation(false);
-      setError(null);
-    } catch (err) {
-      console.error('Error creating workstation:', err);
-      setError('Failed to create workstation. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
-  
   // Handle checkbox selection
   const handleSelect = (assetId) => {
     if (selectedAssets.includes(assetId)) {
@@ -169,28 +111,23 @@ const SelectAssetsModal = ({ isOpen, onClose, employeeId, onSuccess }) => {
       return;
     }
     
-    if (!selectedWorkstation) {
-      setError('Please select or create a workstation to assign assets to.');
-      return;
-    }
-    
     setLoading(true);
     try {
-      // Update each selected asset to assign to the selected workstation
-      await axios.post('/api/assets/assign', {
-        assetIds: selectedAssets,
-        workStationID: selectedWorkstation,
-        assetStatus: assetStatus // Use selected status
-      });
+      // Just return the selected assets with status - let parent handle workstation assignment
+      const assignmentData = {
+        selectedAssetIds: selectedAssets,
+        assetStatus: assetStatus,
+        employeeId: employeeId
+      };
       
       if (onSuccess) {
-        onSuccess();
+        onSuccess(assignmentData);
       }
       
       onClose();
     } catch (err) {
-      console.error('Error assigning assets:', err);
-      setError('Failed to assign assets. Please try again.');
+      console.error('Error preparing asset assignment:', err);
+      setError('Failed to prepare asset assignment. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -274,68 +211,6 @@ const SelectAssetsModal = ({ isOpen, onClose, employeeId, onSuccess }) => {
         </div>
         
         <div className="p-6 border-b border-[#273C45]">
-          {/* Workstation Selection/Creation Section */}
-          <div className="mb-4">
-            <h3 className="text-lg font-medium mb-3">Destination Workstation</h3>
-            
-            {isCreatingWorkstation ? (
-              <div className="flex items-center gap-2">
-                <input
-                  type="text"
-                  placeholder="Enter new workstation name"
-                  className="flex-1 bg-[#13232c] text-white p-2 rounded-md border border-[#273C45]"
-                  value={newWorkstationName}
-                  onChange={(e) => setNewWorkstationName(e.target.value)}
-                />
-                <button
-                  className="bg-[#38b6ff] text-white p-2 rounded-md hover:bg-[#2a9fd9]"
-                  onClick={handleCreateWorkstation}
-                  disabled={loading}
-                >
-                  Create
-                </button>
-                <button
-                  className="bg-[#13232c] text-white p-2 rounded-md border border-[#273C45]"
-                  onClick={() => setIsCreatingWorkstation(false)}
-                >
-                  Cancel
-                </button>
-              </div>
-            ) : (
-              <div className="flex items-center gap-4">
-                <div className="flex-1">
-                  <select
-                    value={selectedWorkstation}
-                    onChange={(e) => setSelectedWorkstation(e.target.value)}
-                    className="w-full bg-[#13232c] text-white p-2 rounded-md border border-[#273C45]"
-                    disabled={loading}
-                  >
-                    <option value="">Select a workstation</option>
-                    {workstations.length > 0 ? (
-                      workstations.map(ws => (
-                        <option key={ws.workStationID} value={ws.workStationID}>
-                          {ws.modelName}
-                        </option>
-                      ))
-                    ) : (
-                      <option value="" disabled>No workstations available</option>
-                    )}
-                  </select>
-                  {workstations.length === 0 && (
-                    <p className="text-yellow-400 text-xs mt-1">No workstations found for this employee</p>
-                  )}
-                </div>
-                <button
-                  className="bg-[#38b6ff] text-white px-4 py-2 rounded-md hover:bg-[#2a9fd9] flex items-center gap-2"
-                  onClick={() => setIsCreatingWorkstation(true)}
-                >
-                  <FaPlus className="w-3 h-3" />
-                  <span>Create New Workstation</span>
-                </button>
-              </div>
-            )}
-          </div>
-          
           {/* Asset Status Selection */}
           <div className="mb-4">
             <h3 className="text-lg font-medium mb-3">Asset Status After Assignment</h3>
@@ -379,14 +254,6 @@ const SelectAssetsModal = ({ isOpen, onClose, employeeId, onSuccess }) => {
               <span className="text-gray-400">
                 {selectedAssets.length} of {filteredAssets.length} assets selected
               </span>
-              <button
-                className="bg-[#38b6ff] text-white px-4 py-2 rounded-md hover:bg-[#2a9fd9] flex items-center gap-2"
-                onClick={handleAssignAssets}
-                disabled={loading || selectedAssets.length === 0 || !selectedWorkstation}
-              >
-                <FaPlus className="w-3 h-3" />
-                <span>Assign Selected</span>
-              </button>
             </div>
           </div>
           
@@ -564,14 +431,14 @@ const SelectAssetsModal = ({ isOpen, onClose, employeeId, onSuccess }) => {
           <button
             className="bg-[#38b6ff] text-white px-4 py-2 rounded-md hover:bg-[#2a9fd9]"
             onClick={handleAssignAssets}
-            disabled={loading || selectedAssets.length === 0 || !selectedWorkstation}
+            disabled={loading || selectedAssets.length === 0}
           >
             {loading ? (
               <span className="flex items-center gap-2">
                 <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
-                <span>Assigning...</span>
+                <span>Processing...</span>
               </span>
-            ) : 'Assign Assets'}
+            ) : 'Select Assets'}
           </button>
         </div>
       </div>

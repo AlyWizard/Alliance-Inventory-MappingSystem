@@ -154,10 +154,39 @@ const AssetInventory = () => {
   };
 
   // Handle successful asset assignment
-  const handleAssignmentSuccess = () => {
-    fetchEmployeeAssets(employeeData.empID); // Refresh the assets list
+  //onst handleAssignmentSuccess = (assignmentData) => {
+    //fetchEmployeeAssets(employeeData.empID); // Refresh the assets list
+   // setSelectedItems([]); // Clear selection
+  //};
+
+  // Handle successful asset assignment
+const handleAssignmentSuccess = async (assignmentData) => {
+  try {
+    // assignmentData contains: selectedAssetIds, assetStatus, employeeId
+    const { selectedAssetIds, assetStatus } = assignmentData;
+    
+    if (!currentWorkstationId) {
+      setError('No workstation available for this employee. Please create a workstation first.');
+      return;
+    }
+    
+    // Assign the selected assets to the employee's current workstation
+    await axios.post('/api/assets/assign', {
+      assetIds: selectedAssetIds,
+      workStationID: currentWorkstationId,
+      assetStatus: assetStatus
+    });
+    
+    // Refresh the assets list
+    fetchEmployeeAssets(employeeData.empID);
     setSelectedItems([]); // Clear selection
-  };
+    setError(null); // Clear any errors
+    
+  } catch (err) {
+    console.error('Error assigning assets:', err);
+    setError('Failed to assign assets. Please try again.');
+  }
+};
   
   // Handle successful asset transfer
   const handleTransferSuccess = () => {
@@ -673,6 +702,7 @@ const handleBackToEmployees = () => {
         onClose={() => setIsTransferModalOpen(false)}
         assetIds={selectedItems}
         currentWorkstationId={currentWorkstationId}
+        currentEmployee={employeeData}  // Add this line
         onSuccess={handleTransferSuccess}
       />
     </div>

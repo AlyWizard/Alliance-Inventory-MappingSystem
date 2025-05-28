@@ -341,8 +341,6 @@ const Company = () => {
         onClose={() => setIsAddModalOpen(false)}
         onSuccess={handleCompanyAdded}
       />
-      
-    {/*Fetch the data form from here*/}
         
 
       {currentCompany && (
