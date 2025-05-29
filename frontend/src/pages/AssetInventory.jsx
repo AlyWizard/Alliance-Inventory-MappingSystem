@@ -233,7 +233,7 @@ const handleAssignmentSuccess = async (assignmentData) => {
       'Asset Name': asset.assetName || '',
       'Asset Tag': asset.assetTag || '',
       'Serial Number': asset.serialNo || '',
-      'Category': asset.categoryName || '',
+      'Category': asset.categoryType || '',
       'Model': asset.modelName || '',
       'Status': asset.assetStatus || '',
       'Workstation': asset.workstationName || 'None',
@@ -268,7 +268,7 @@ const handleAssignmentSuccess = async (assignmentData) => {
     asset.assetTag?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     asset.serialNo?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     asset.modelName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    asset.categoryName?.toLowerCase().includes(searchTerm.toLowerCase())
+    asset.categoryType?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   // Handle back button click
@@ -664,7 +664,7 @@ const handleBackToEmployees = () => {
                         <td className="p-4">{asset.assetTag}</td>
                         <td className="p-4">{asset.serialNo}</td>
                         <td className="p-4">{asset.modelName}</td>
-                        <td className="p-4">{asset.categoryName}</td>
+                        <td className="p-4">{asset.categoryType || 'N/A'}</td>
                         <td className="p-4">
                           <span className={`px-2 py-1 rounded-full text-xs ${
                             asset.assetStatus === 'Ready to Deploy' ? 'bg-green-500' :

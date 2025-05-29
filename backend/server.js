@@ -43,6 +43,16 @@ const upload = multer({
   }
 });
 
+
+// Add this AFTER your multer configuration and BEFORE your asset routes in server.js
+
+// Add this route to your server.js file (after your multer configuration)
+// Make sure the path matches what your frontend is calling
+
+
+
+//====================================================================================
+
 app.use(cors({
   origin: ['http://localhost:3001', 'http://localhost:5173'],
   credentials: true
@@ -147,20 +157,84 @@ app.post('/api/login', async (req, res) => {
   }
 });
 
+
+// ================== IMAGE UPLOAD ROUTES ==================
+
+// Test route to verify server is working
+app.get('/api/test', (req, res) => {
+  console.log('Test route called');
+  res.json({ 
+    message: 'Server is working!', 
+    timestamp: new Date().toISOString(),
+    uploadDirExists: require('fs').existsSync(uploadDir),
+    uploadDir: uploadDir
+  });
+});
+
+// Image upload route for both Add and Edit modals
+app.post('/api/assets/upload-image', upload.single('image'), (req, res) => {
+  try {
+    console.log('🚀 Image upload request received');
+    console.log('File received:', !!req.file);
+    
+    if (!req.file) {
+      console.log('❌ No file provided');
+      return res.status(400).json({ 
+        error: 'No image file provided',
+        message: 'Please select an image file to upload'
+      });
+    }
+
+    console.log('✅ File upload successful:', {
+      originalName: req.file.originalname,
+      filename: req.file.filename,
+      size: req.file.size,
+      mimetype: req.file.mimetype
+    });
+
+    // Return response that matches what your frontend expects
+    res.json({
+      success: true,
+      message: 'Image uploaded successfully',
+      filename: req.file.filename,
+      path: req.file.filename, // This is what your modals expect
+      originalName: req.file.originalname,
+      size: req.file.size
+    });
+    
+  } catch (error) {
+    console.error('❌ Upload error:', error);
+    res.status(500).json({ 
+      error: 'Failed to upload image',
+      message: error.message
+    });
+  }
+});
+
 // ================== ASSET MANAGEMENT ROUTES ==================
 
 // Get all assets
 app.get('/api/assets', async (req, res) => {
   try {
     const [rows] = await db.query(`
-      SELECT a.*, c.categoryName, m.modelName, 
+      SELECT a.*, 
+             c.categoryName,
+             c.categoryType, 
+             m.modelName, 
+             mf.manufName,
              e.empFirstName, e.empLastName, e.empUserName,
-             w.modelName as workstationName
+             w.modelName as workstationName,
+             be.empFirstName as borrowEmployeeFirstName,
+             be.empLastName as borrowEmployeeLastName,
+             CONCAT(be.empFirstName, ' ', be.empLastName) as borrowEmployeeName
       FROM assets a
       LEFT JOIN categories c ON a.categoryID = c.categoryID
       LEFT JOIN models m ON a.modelID = m.modelID
+      LEFT JOIN manufacturers mf ON m.manufID = mf.manufID
       LEFT JOIN workstations w ON a.workStationID = w.workStationID
       LEFT JOIN employees e ON w.empID = e.empID
+      LEFT JOIN employees be ON a.borrowEmployeeID = be.empID
+      ORDER BY a.assetID DESC
     `);
     res.json(rows);
   } catch (error) {
@@ -196,24 +270,108 @@ app.get('/api/assets/:id', async (req, res) => {
   }
 });
 
-// Create new asset
+// Replace your existing POST /api/assets route with this fixed version:
+
+// Replace your existing POST /api/assets route with this updated version:
+
 app.post('/api/assets', async (req, res) => {
   try {
     const { 
       assetName, assetTag, modelID, categoryID, assetStatus, 
       serialNo, workStationID, imagePath, isBorrowed, 
-      borrowStartDate, borrowEndDate 
+      borrowStartDate, borrowEndDate, borrowEmployeeID 
     } = req.body;
     
-    // Check if serial number or asset tag already exists
-    const [existingAssets] = await db.query(`
-      SELECT * FROM assets WHERE serialNo = ? OR assetTag = ?
-    `, [serialNo, assetTag]);
+    console.log('Received asset data:', req.body);
     
-    if (existingAssets.length > 0) {
+    // Validate required fields
+    if (!assetTag || !assetTag.trim()) {
       return res.status(400).json({ 
-        error: 'Serial number or asset tag already exists' 
+        errors: { assetTag: 'Asset tag is required' }
       });
+    }
+    
+    if (!modelID) {
+      return res.status(400).json({ 
+        errors: { modelID: 'Model is required' }
+      });
+    }
+    
+    // Handle optional fields - Leave asset name empty if not provided
+    const finalAssetName = assetName && assetName.trim() ? assetName.trim() : null;
+    const finalSerialNo = serialNo && serialNo.trim() ? serialNo.trim() : null;
+    
+    // Check if serial number or asset tag already exists (only if they have actual values)
+    let duplicateCheckQuery = 'SELECT * FROM assets WHERE ';
+    let duplicateCheckParams = [];
+    let conditions = [];
+    
+    if (finalSerialNo) {
+      conditions.push('serialNo = ?');
+      duplicateCheckParams.push(finalSerialNo);
+    }
+    
+    if (assetTag && assetTag.trim()) {
+      conditions.push('assetTag = ?');
+      duplicateCheckParams.push(assetTag.trim());
+    }
+    
+    // Only run duplicate check if we have parameters to check
+    if (conditions.length > 0) {
+      duplicateCheckQuery += conditions.join(' OR ');
+      const [existingAssets] = await db.query(duplicateCheckQuery, duplicateCheckParams);
+      
+      if (existingAssets.length > 0) {
+        const existingAsset = existingAssets[0];
+        if (existingAsset.assetTag === assetTag.trim()) {
+          return res.status(400).json({ 
+            errors: { assetTag: 'Asset tag already exists' }
+          });
+        }
+        if (existingAsset.serialNo === finalSerialNo) {
+          return res.status(400).json({ 
+            errors: { serialNo: 'Serial number already exists' }
+          });
+        }
+      }
+    }
+    
+    // Validate model and get category from model
+    const [modelCheck] = await db.query('SELECT * FROM models WHERE modelID = ?', [modelID]);
+    if (modelCheck.length === 0) {
+      return res.status(400).json({ 
+        errors: { modelID: 'Selected model does not exist' }
+      });
+    }
+    
+    // Get category from model (auto-assign)
+    const finalCategoryID = modelCheck[0].categoryID;
+    
+    // Validate borrow fields if borrowed
+    if (isBorrowed) {
+      if (!borrowEmployeeID) {
+        return res.status(400).json({ 
+          errors: { borrowEmployeeID: 'Employee is required for borrowed assets' }
+        });
+      }
+      if (!borrowStartDate) {
+        return res.status(400).json({ 
+          errors: { borrowStartDate: 'Start date is required for borrowed assets' }
+        });
+      }
+      if (!borrowEndDate) {
+        return res.status(400).json({ 
+          errors: { borrowEndDate: 'End date is required for borrowed assets' }
+        });
+      }
+      
+      // Check if employee exists
+      const [employeeCheck] = await db.query('SELECT * FROM employees WHERE empID = ?', [borrowEmployeeID]);
+      if (employeeCheck.length === 0) {
+        return res.status(400).json({ 
+          errors: { borrowEmployeeID: 'Selected employee does not exist' }
+        });
+      }
     }
     
     // Insert new asset
@@ -221,534 +379,296 @@ app.post('/api/assets', async (req, res) => {
       INSERT INTO assets (
         assetName, assetTag, modelID, categoryID, assetStatus, 
         serialNo, workStationID, imagePath, isBorrowed, 
-        borrowStartDate, borrowEndDate, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+        borrowStartDate, borrowEndDate, borrowEmployeeID, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
     `, [
-      assetName, assetTag, modelID, categoryID, assetStatus, 
-      serialNo, workStationID || null, imagePath || null, 
-      isBorrowed ? 1 : 0, borrowStartDate || null, borrowEndDate || null
+      finalAssetName, 
+      assetTag.trim(), 
+      modelID, 
+      finalCategoryID, 
+      assetStatus || 'Ready to Deploy', 
+      finalSerialNo, 
+      workStationID || null, 
+      imagePath || null, 
+      isBorrowed ? 1 : 0, 
+      isBorrowed ? borrowStartDate : null, 
+      isBorrowed ? borrowEndDate : null,
+      isBorrowed ? borrowEmployeeID : null
     ]);
     
-    // Get the newly created asset
+    console.log('Asset created with ID:', result.insertId);
+    
+    // Get the newly created asset with all related data
     const [newAsset] = await db.query(`
-      SELECT a.*, c.categoryName, m.modelName,
+      SELECT a.*, c.categoryName, c.categoryType, m.modelName, mf.manufName,
              e.empFirstName, e.empLastName, e.empUserName,
-             w.modelName as workstationName
+             w.modelName as workstationName,
+             be.empFirstName as borrowEmployeeFirstName,
+             be.empLastName as borrowEmployeeLastName,
+             CONCAT(be.empFirstName, ' ', be.empLastName) as borrowEmployeeName
       FROM assets a
       LEFT JOIN categories c ON a.categoryID = c.categoryID
       LEFT JOIN models m ON a.modelID = m.modelID
+      LEFT JOIN manufacturers mf ON m.manufID = mf.manufID
       LEFT JOIN workstations w ON a.workStationID = w.workStationID
       LEFT JOIN employees e ON w.empID = e.empID
+      LEFT JOIN employees be ON a.borrowEmployeeID = be.empID
       WHERE a.assetID = ?
     `, [result.insertId]);
+    
+    console.log('Retrieved new asset:', newAsset[0]);
     
     res.status(201).json(newAsset[0]);
   } catch (error) {
     console.error('Error creating asset:', error);
-    res.status(500).json({ error: 'Failed to create asset' });
-  }
-});
-
-// Update asset
-app.put('/api/assets/:id', async (req, res) => {
-  try {
-    const { 
-      assetName, assetTag, modelID, categoryID, assetStatus, 
-      serialNo, workStationID, imagePath, isBorrowed, 
-      borrowStartDate, borrowEndDate 
-    } = req.body;
+    console.error('Error details:', {
+      message: error.message,
+      code: error.code,
+      sqlMessage: error.sqlMessage,
+      sql: error.sql
+    });
     
-    // Check if serial number or asset tag already exists (excluding current asset)
-    if (serialNo || assetTag) {
-      const [existingAssets] = await db.query(`
-        SELECT * FROM assets 
-        WHERE (serialNo = ? OR assetTag = ?) AND assetID != ?
-      `, [serialNo, assetTag, req.params.id]);
-      
-      if (existingAssets.length > 0) {
-        return res.status(400).json({ 
-          error: 'Serial number or asset tag already exists' 
-        });
-      }
-    }
-    
-    // Build dynamic update SQL
-    const updateFields = [];
-    const updateValues = [];
-    
-    if (assetName !== undefined) {
-      updateFields.push('assetName = ?');
-      updateValues.push(assetName);
-    }
-    
-    if (assetTag !== undefined) {
-      updateFields.push('assetTag = ?');
-      updateValues.push(assetTag);
-    }
-    
-    if (modelID !== undefined) {
-      updateFields.push('modelID = ?');
-      updateValues.push(modelID);
-    }
-    
-    if (categoryID !== undefined) {
-      updateFields.push('categoryID = ?');
-      updateValues.push(categoryID);
-    }
-    
-    if (assetStatus !== undefined) {
-      updateFields.push('assetStatus = ?');
-      updateValues.push(assetStatus);
-    }
-    
-    if (serialNo !== undefined) {
-      updateFields.push('serialNo = ?');
-      updateValues.push(serialNo);
-    }
-    
-    if (workStationID !== undefined) {
-      updateFields.push('workStationID = ?');
-      updateValues.push(workStationID || null);
-    }
-    
-    if (imagePath !== undefined) {
-      updateFields.push('imagePath = ?');
-      updateValues.push(imagePath || null);
-    }
-    
-    if (isBorrowed !== undefined) {
-      updateFields.push('isBorrowed = ?');
-      updateValues.push(isBorrowed ? 1 : 0);
-    }
-    
-    if (borrowStartDate !== undefined) {
-      updateFields.push('borrowStartDate = ?');
-      updateValues.push(borrowStartDate || null);
-    }
-    
-    if (borrowEndDate !== undefined) {
-      updateFields.push('borrowEndDate = ?');
-      updateValues.push(borrowEndDate || null);
-    }
-    
-    updateFields.push('updated_at = NOW()');
-    
-    // Add the ID to the update values
-    updateValues.push(req.params.id);
-    
-    if (updateFields.length === 0) {
-      return res.status(400).json({ error: 'No fields to update' });
-    }
-    
-    // Update the asset
-    await db.query(`
-      UPDATE assets SET ${updateFields.join(', ')} WHERE assetID = ?
-    `, updateValues);
-    
-    // Get the updated asset
-    const [updatedAsset] = await db.query(`
-      SELECT a.*, c.categoryName, m.modelName,
-             e.empFirstName, e.empLastName, e.empUserName,
-             w.modelName as workstationName
-      FROM assets a
-      LEFT JOIN categories c ON a.categoryID = c.categoryID
-      LEFT JOIN models m ON a.modelID = m.modelID
-      LEFT JOIN workstations w ON a.workStationID = w.workStationID
-      LEFT JOIN employees e ON w.empID = e.empID
-      WHERE a.assetID = ?
-    `, [req.params.id]);
-    
-    if (updatedAsset.length === 0) {
-      return res.status(404).json({ error: 'Asset not found' });
-    }
-    
-    res.json(updatedAsset[0]);
-  } catch (error) {
-    console.error('Error updating asset:', error);
-    res.status(500).json({ error: 'Failed to update asset' });
-  }
-});
-
-// Delete asset
-app.delete('/api/assets/:id', async (req, res) => {
-  try {
-    // Check if asset exists
-    const [asset] = await db.query(`
-      SELECT * FROM assets WHERE assetID = ?
-    `, [req.params.id]);
-    
-    if (asset.length === 0) {
-      return res.status(404).json({ error: 'Asset not found' });
-    }
-    
-    // Delete the asset
-    await db.query(`
-      DELETE FROM assets WHERE assetID = ?
-    `, [req.params.id]);
-    
-    res.status(204).send();
-  } catch (error) {
-    console.error('Error deleting asset:', error);
-    res.status(500).json({ error: 'Failed to delete asset' });
-  }
-});
-
-// Upload image endpoint
-// Upload image endpoint
-app.post('/api/assets/upload-image', upload.single('image'), (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({ error: 'No image file provided' });
-  }
-  
-  // Extract just the filename and folder structure without the full path
-  const relativePath = req.file.path.substring(req.file.path.indexOf('uploads'));
-  
-  res.json({
-    path: relativePath,
-    url: `${req.protocol}://${req.get('host')}/${relativePath}`
-  });
-});
-
-// Get all categories
-app.get('/api/categories', async (req, res) => {
-  try {
-    const [categories] = await db.query('SELECT * FROM categories');
-    res.json(categories);
-  } catch (error) {
-    console.error('Error fetching categories:', error);
-    res.status(500).json({ error: 'Failed to fetch categories' });
-  }
-});
-
-// Get all models
-app.get('/api/models', async (req, res) => {
-  try {
-    const [models] = await db.query(`
-      SELECT m.*, mf.manufName
-      FROM models m
-      LEFT JOIN manufacturers mf ON m.manufID = mf.manufID
-    `);
-    res.json(models);
-  } catch (error) {
-    console.error('Error fetching models:', error);
-    res.status(500).json({ error: 'Failed to fetch models' });
-  }
-});
-
-// Get all employees
-app.get('/api/employees', async (req, res) => {
-  try {
-    const [employees] = await db.query('SELECT * FROM employees');
-    res.json(employees);
-  } catch (error) {
-    console.error('Error fetching employees:', error);
-    res.status(500).json({ error: 'Failed to fetch employees' });
-  }
-});
-
-// Get workstations for an employee
-app.get('/api/employees/:id/workstations', async (req, res) => {
-  try {
-    const [workstations] = await db.query(`
-      SELECT * FROM workstations WHERE empID = ?
-    `, [req.params.id]);
-    res.json(workstations);
-  } catch (error) {
-    console.error('Error fetching workstations:', error);
-    res.status(500).json({ error: 'Failed to fetch workstations' });
-  }
-});
-
-// Create workstation
-app.post('/api/workstations', async (req, res) => {
-  try {
-    const { modelName, empID } = req.body;
-    
-    const [result] = await db.query(`
-      INSERT INTO workstations (
-        modelName, empID, created_at, updated_at
-      ) VALUES (?, ?, NOW(), NOW())
-    `, [modelName, empID]);
-    
-    const [newWorkstation] = await db.query(`
-      SELECT * FROM workstations WHERE workStationID = ?
-    `, [result.insertId]);
-    
-    res.status(201).json(newWorkstation[0]);
-  } catch (error) {
-    console.error('Error creating workstation:', error);
-    res.status(500).json({ error: 'Failed to create workstation' });
-  }
-});
-{/** 
-// ================== EMPLOYEE MANAGEMENT ROUTES ==================
-
-// Get all employees
-app.get('/api/employees', async (req, res) => {
-  try {
-    const [rows] = await db.query(`
-      SELECT * FROM employees
-      ORDER BY empID DESC
-    `);
-    res.json(rows);
-  } catch (error) {
-    console.error('Error fetching employees:', error);
-    res.status(500).json({ error: 'Failed to fetch employees' });
-  }
-});
-
-// Get employee by ID
-app.get('/api/employees/:id', async (req, res) => {
-  try {
-    const [rows] = await db.query(`
-      SELECT * FROM employees
-      WHERE empID = ?
-    `, [req.params.id]);
-    
-    if (rows.length === 0) {
-      res.status(404).json({ error: 'Employee not found' });
-      return;
-    }
-    
-    res.json(rows[0]);
-  } catch (error) {
-    console.error('Error fetching employee:', error);
-    res.status(500).json({ error: 'Failed to fetch employee' });
-  }
-});
-
-// Create new employee
-app.post('/api/employees', async (req, res) => {
-  try {
-    const { 
-      empFirstName, 
-      empLastName, 
-      empUserName, 
-      empDept,
-      employeeCount,
-      employeeStatus,
-      created_at,
-      updated_at
-    } = req.body;
-    
-    // Check if username already exists
-    const [existingEmps] = await db.query(`
-      SELECT * FROM employees WHERE empUserName = ?
-    `, [empUserName]);
-    
-    if (existingEmps.length > 0) {
+    // Handle specific MySQL errors
+    if (error.code === 'ER_BAD_NULL_ERROR') {
       return res.status(400).json({ 
-        errors: { empUserName: 'Username already exists' }
+        error: 'Required field missing',
+        message: `Database constraint violation: ${error.sqlMessage}`,
+        details: error.sqlMessage
       });
     }
     
-    // Insert new employee
-    const [result] = await db.query(`
-      INSERT INTO employees (
-        empFirstName, 
-        empLastName, 
-        empUserName, 
-        empDept,
-        employeeCount,
-        employeeStatus,
-        created_at, 
-        updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())
-    `, [
-      empFirstName, 
-      empLastName, 
-      empUserName, 
-      empDept,
-      employeeCount || 0,
-      employeeStatus || 'active'
-    ]);
+    if (error.code === 'ER_DUP_ENTRY') {
+      return res.status(400).json({ 
+        error: 'Duplicate entry detected',
+        message: 'Asset tag or serial number already exists',
+        details: error.sqlMessage
+      });
+    }
     
-    // Get the newly created employee
-    const [newEmployee] = await db.query(`
-      SELECT * FROM employees
-      WHERE empID = ?
-    `, [result.insertId]);
+    if (error.code === 'ER_NO_REFERENCED_ROW_2') {
+      return res.status(400).json({ 
+        error: 'Referenced record not found',
+        message: 'Model, category, or employee reference is invalid',
+        details: error.sqlMessage
+      });
+    }
     
-    res.status(201).json(newEmployee[0]);
-  } catch (error) {
-    console.error('Error creating employee:', error);
-    res.status(500).json({ error: 'Failed to create employee' });
+    res.status(500).json({ 
+      error: 'Failed to create asset',
+      message: error.message,
+      code: error.code,
+      details: process.env.NODE_ENV === 'development' ? error.sqlMessage : 'Internal server error'
+    });
   }
 });
 
-// Update employee
-app.put('/api/employees/:id', async (req, res) => {
+///----------------------------------------------------------------------------------------------
+
+// Replace your PUT /api/assets/:id route with this updated version that handles image deletion
+
+app.put('/api/assets/:id', async (req, res) => {
   try {
+    const assetId = req.params.id;
     const { 
-      empFirstName, 
-      empLastName, 
-      empUserName, 
-      empDept,
-      employeeCount,
-      employeeStatus
+      assetName, assetTag, modelID, categoryID, assetStatus, 
+      serialNo, workStationID, imagePath, isBorrowed, 
+      borrowStartDate, borrowEndDate, borrowEmployeeID, imageUpdated 
     } = req.body;
     
-    // Check if username already exists (excluding current employee)
-    if (empUserName) {
-      const [existingEmps] = await db.query(`
-        SELECT * FROM employees 
-        WHERE empUserName = ? AND empID != ?
-      `, [empUserName, req.params.id]);
+    console.log('🔄 Updating asset ID:', assetId);
+    console.log('📷 Image should be updated:', imageUpdated);
+    console.log('🖼️ New image path:', imagePath === null ? 'DELETE_IMAGE' : (imagePath || 'NO_CHANGE'));
+    
+    // Check if asset exists
+    const [existingAsset] = await db.query('SELECT * FROM assets WHERE assetID = ?', [assetId]);
+    if (existingAsset.length === 0) {
+      return res.status(404).json({ error: 'Asset not found' });
+    }
+    
+    // Validate required fields
+    if (!assetTag || !assetTag.trim()) {
+      return res.status(400).json({ 
+        errors: { assetTag: 'Asset tag is required' }
+      });
+    }
+    
+    if (!modelID) {
+      return res.status(400).json({ 
+        errors: { modelID: 'Model is required' }
+      });
+    }
+    
+    // Handle optional fields
+    const finalAssetName = assetName && assetName.trim() ? assetName.trim() : null;
+    const finalSerialNo = serialNo && serialNo.trim() ? serialNo.trim() : null;
+    
+    // Check for duplicates (excluding current asset)
+    let duplicateCheckQuery = 'SELECT * FROM assets WHERE assetID != ? AND (';
+    let duplicateCheckParams = [assetId];
+    let conditions = [];
+    
+    if (finalSerialNo) {
+      conditions.push('serialNo = ?');
+      duplicateCheckParams.push(finalSerialNo);
+    }
+    
+    if (assetTag && assetTag.trim()) {
+      conditions.push('assetTag = ?');
+      duplicateCheckParams.push(assetTag.trim());
+    }
+    
+    if (conditions.length > 0) {
+      duplicateCheckQuery += conditions.join(' OR ') + ')';
+      const [existingAssets] = await db.query(duplicateCheckQuery, duplicateCheckParams);
       
-      if (existingEmps.length > 0) {
+      if (existingAssets.length > 0) {
+        const existingAsset = existingAssets[0];
+        if (existingAsset.assetTag === assetTag.trim()) {
+          return res.status(400).json({ 
+            errors: { assetTag: 'Asset tag already exists' }
+          });
+        }
+        if (existingAsset.serialNo === finalSerialNo) {
+          return res.status(400).json({ 
+            errors: { serialNo: 'Serial number already exists' }
+          });
+        }
+      }
+    }
+    
+    // Validate model and get category from model
+    const [modelCheck] = await db.query('SELECT * FROM models WHERE modelID = ?', [modelID]);
+    if (modelCheck.length === 0) {
+      return res.status(400).json({ 
+        errors: { modelID: 'Selected model does not exist' }
+      });
+    }
+    
+    // Get category from model (auto-assign)
+    const finalCategoryID = modelCheck[0].categoryID;
+    
+    // Validate borrow fields if borrowed
+    if (isBorrowed) {
+      if (!borrowEmployeeID) {
         return res.status(400).json({ 
-          errors: { empUserName: 'Username already exists' }
+          errors: { borrowEmployeeID: 'Employee is required for borrowed assets' }
+        });
+      }
+      if (!borrowStartDate) {
+        return res.status(400).json({ 
+          errors: { borrowStartDate: 'Start date is required for borrowed assets' }
+        });
+      }
+      if (!borrowEndDate) {
+        return res.status(400).json({ 
+          errors: { borrowEndDate: 'End date is required for borrowed assets' }
+        });
+      }
+      
+      // Check if employee exists
+      const [employeeCheck] = await db.query('SELECT * FROM employees WHERE empID = ?', [borrowEmployeeID]);
+      if (employeeCheck.length === 0) {
+        return res.status(400).json({ 
+          errors: { borrowEmployeeID: 'Selected employee does not exist' }
         });
       }
     }
     
-    // Build dynamic update SQL
-    const updateFields = [];
-    const updateValues = [];
+    // Build the update query - handle image update/deletion/keep
+    let updateQuery, updateParams;
     
-    if (empFirstName !== undefined) {
-      updateFields.push('empFirstName = ?');
-      updateValues.push(empFirstName);
+    if (imageUpdated === true) {
+      // Update including image path (this can be null for deletion or a filename for update)
+      if (imagePath === null) {
+        console.log('🗑️ Deleting image from asset');
+      } else {
+        console.log('✅ Updating asset with new image path:', imagePath);
+      }
+      
+      updateQuery = `
+        UPDATE assets SET
+          assetName = ?, assetTag = ?, modelID = ?, categoryID = ?, assetStatus = ?, 
+          serialNo = ?, workStationID = ?, imagePath = ?, isBorrowed = ?, 
+          borrowStartDate = ?, borrowEndDate = ?, borrowEmployeeID = ?, updated_at = NOW()
+        WHERE assetID = ?
+      `;
+      updateParams = [
+        finalAssetName, 
+        assetTag.trim(), 
+        modelID, 
+        finalCategoryID, 
+        assetStatus || 'Ready to Deploy', 
+        finalSerialNo, 
+        workStationID || null, 
+        imagePath, // This can be null (deletion) or filename (update)
+        isBorrowed ? 1 : 0, 
+        isBorrowed ? borrowStartDate : null, 
+        isBorrowed ? borrowEndDate : null,
+        isBorrowed ? borrowEmployeeID : null,
+        assetId
+      ];
+    } else {
+      // Update without changing image path - KEEP EXISTING IMAGE
+      console.log('⚠️ Updating asset WITHOUT changing image path - keeping existing image');
+      updateQuery = `
+        UPDATE assets SET
+          assetName = ?, assetTag = ?, modelID = ?, categoryID = ?, assetStatus = ?, 
+          serialNo = ?, workStationID = ?, isBorrowed = ?, 
+          borrowStartDate = ?, borrowEndDate = ?, borrowEmployeeID = ?, updated_at = NOW()
+        WHERE assetID = ?
+      `;
+      updateParams = [
+        finalAssetName, 
+        assetTag.trim(), 
+        modelID, 
+        finalCategoryID, 
+        assetStatus || 'Ready to Deploy', 
+        finalSerialNo, 
+        workStationID || null, 
+        isBorrowed ? 1 : 0, 
+        isBorrowed ? borrowStartDate : null, 
+        isBorrowed ? borrowEndDate : null,
+        isBorrowed ? borrowEmployeeID : null,
+        assetId
+      ];
     }
     
-    if (empLastName !== undefined) {
-      updateFields.push('empLastName = ?');
-      updateValues.push(empLastName);
-    }
+    // Execute the update
+    await db.query(updateQuery, updateParams);
     
-    if (empUserName !== undefined) {
-      updateFields.push('empUserName = ?');
-      updateValues.push(empUserName);
-    }
+    console.log('✅ Asset updated successfully:', assetId);
     
-    if (empDept !== undefined) {
-      updateFields.push('empDept = ?');
-      updateValues.push(empDept);
-    }
+    // Get the updated asset with all related data
+    const [updatedAsset] = await db.query(`
+      SELECT a.*, c.categoryName, c.categoryType, m.modelName, mf.manufName,
+             e.empFirstName, e.empLastName, e.empUserName,
+             w.modelName as workstationName,
+             be.empFirstName as borrowEmployeeFirstName,
+             be.empLastName as borrowEmployeeLastName,
+             CONCAT(be.empFirstName, ' ', be.empLastName) as borrowEmployeeName
+      FROM assets a
+      LEFT JOIN categories c ON a.categoryID = c.categoryID
+      LEFT JOIN models m ON a.modelID = m.modelID
+      LEFT JOIN manufacturers mf ON m.manufID = mf.manufID
+      LEFT JOIN workstations w ON a.workStationID = w.workStationID
+      LEFT JOIN employees e ON w.empID = e.empID
+      LEFT JOIN employees be ON a.borrowEmployeeID = be.empID
+      WHERE a.assetID = ?
+    `, [assetId]);
     
-    if (employeeCount !== undefined) {
-      updateFields.push('employeeCount = ?');
-      updateValues.push(employeeCount);
-    }
+    console.log('📄 Retrieved updated asset - imagePath:', updatedAsset[0]?.imagePath || 'NO_IMAGE');
     
-    if (employeeStatus !== undefined) {
-      updateFields.push('employeeStatus = ?');
-      updateValues.push(employeeStatus);
-    }
-    
-    updateFields.push('updated_at = NOW()');
-    
-    // Add the ID to the update values
-    updateValues.push(req.params.id);
-    
-    if (updateFields.length === 0) {
-      return res.status(400).json({ error: 'No fields to update' });
-    }
-    
-    // Update the employee
-    await db.query(`
-      UPDATE employees SET ${updateFields.join(', ')} WHERE empID = ?
-    `, updateValues);
-    
-    // Get the updated employee
-    const [updatedEmployee] = await db.query(`
-      SELECT * FROM employees
-      WHERE empID = ?
-    `, [req.params.id]);
-    
-    if (updatedEmployee.length === 0) {
-      return res.status(404).json({ error: 'Employee not found' });
-    }
-    
-    res.json(updatedEmployee[0]);
+    res.json(updatedAsset[0]);
   } catch (error) {
-    console.error('Error updating employee:', error);
-    res.status(500).json({ error: 'Failed to update employee' });
+    console.error('❌ Error updating asset:', error);
+    res.status(500).json({ 
+      error: 'Failed to update asset',
+      message: error.message
+    });
   }
 });
 
-// Delete employee
-app.delete('/api/employees/:id', async (req, res) => {
-  try {
-    // Check if employee exists
-    const [employee] = await db.query(`
-      SELECT * FROM employees WHERE empID = ?
-    `, [req.params.id]);
-    
-    if (employee.length === 0) {
-      return res.status(404).json({ error: 'Employee not found' });
-    }
-    
-    // Delete the employee
-    await db.query(`
-      DELETE FROM employees WHERE empID = ?
-    `, [req.params.id]);
-    
-    res.status(204).send();
-  } catch (error) {
-    console.error('Error deleting employee:', error);
-    res.status(500).json({ error: 'Failed to delete employee' });
-  }
-});
-
-// Get all departments (for dropdown)
-app.get('/api/departments', async (req, res) => {
-  try {
-    // If you have a departments table, query it
-    // If not, send dummy data
-    try {
-      const [departments] = await db.query('SELECT * FROM departments');
-      res.json(departments);
-    } catch (err) {
-      // Fallback if the table doesn't exist
-      res.json([
-        { deptID: 1, deptName: 'IT' },
-        { deptID: 2, deptName: 'HR' },
-        { deptID: 3, deptName: 'Finance' },
-        { deptID: 4, deptName: 'Marketing' },
-        { deptID: 5, deptName: 'Operations' },
-        { deptID: 6, deptName: 'Alliance IT Department - Intern' }
-      ]);
-    }
-  } catch (error) {
-    console.error('Error fetching departments:', error);
-    res.status(500).json({ error: 'Failed to fetch departments' });
-  }
-});
-
-// Keep track of deleted employee IDs
-app.get('/api/employees/next-available-id', async (req, res) => {
-  try {
-    // First, check if there are any gaps in the ID sequence
-    const [result] = await db.query(`
-      SELECT empID + 1 as next_id
-      FROM employees e1
-      WHERE NOT EXISTS (
-        SELECT 1 FROM employees e2 WHERE e2.empID = e1.empID + 1
-      )
-      ORDER BY empID
-      LIMIT 1
-    `);
-
-    // If there's a gap, return the first available ID
-    if (result.length > 0) {
-      return res.json({ nextId: result[0].next_id });
-    }
-
-    // If no gaps, get the maximum ID and return the next one
-    const [maxResult] = await db.query(`
-      SELECT IFNULL(MAX(empID), 0) + 1 as next_id
-      FROM employees
-    `);
-
-    res.json({ nextId: maxResult[0].next_id });
-  } catch (error) {
-    console.error('Error finding next available ID:', error);
-    res.status(500).json({ error: 'Failed to determine next available ID' });
-  }
-}); */}
-
-// ================== EMPLOYEE MANAGEMENT ROUTES ==================
+//=========================================================
 
 // Get all employees
 app.get('/api/employees', async (req, res) => {
@@ -1445,14 +1365,17 @@ app.patch('/api/manufacturers/:id/count', async (req, res) => {
 // Get all models
 app.get('/api/models', async (req, res) => {
   try {
-    const [rows] = await db.query(`
-      SELECT m.*, c.categoryName, mf.manufName
+    const [models] = await db.query(`
+      SELECT m.*, 
+             c.categoryName, 
+             c.categoryType,
+             mf.manufName as manufacturerName
       FROM models m
       LEFT JOIN categories c ON m.categoryID = c.categoryID
       LEFT JOIN manufacturers mf ON m.manufID = mf.manufID
       ORDER BY m.modelID DESC
     `);
-    res.json(rows);
+    res.json(models);
   } catch (error) {
     console.error('Error fetching models:', error);
     res.status(500).json({ error: 'Failed to fetch models' });
@@ -1745,6 +1668,7 @@ async function updateCategoryCount(categoryID) {
   }
 }
 
+// In your server.js, find this endpoint (around line 900+):
 // Get assets assigned to an employee
 app.get('/api/employees/:id/assets', async (req, res) => {
   try {
@@ -1765,7 +1689,7 @@ app.get('/api/employees/:id/assets', async (req, res) => {
     
     // Find all assets assigned to any of the employee's workstations
     const [assets] = await db.query(`
-      SELECT a.*, c.categoryName, m.modelName, 
+      SELECT a.*, c.categoryName, c.categoryType, m.modelName, 
              e.empFirstName, e.empLastName, e.empUserName,
              w.modelName as workstationName
       FROM assets a

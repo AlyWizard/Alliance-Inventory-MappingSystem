@@ -18,6 +18,7 @@ const EditAssetModal = ({ isOpen, onClose, onSuccess, asset }) => {
   
   const [image, setImage] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
+  const [imageDeleted, setImageDeleted] = useState(false); // NEW: Track if image should be deleted
   const [models, setModels] = useState([]);
   const [categories, setCategories] = useState([]);
   const [employees, setEmployees] = useState([]);
@@ -35,9 +36,20 @@ const EditAssetModal = ({ isOpen, onClose, onSuccess, asset }) => {
     { value: 'Defective', color: 'bg-red-500' }
   ];
 
+  // Reset state when modal closes
+  useEffect(() => {
+    if (!isOpen) {
+      // Clear all image state when modal closes
+      setImage(null);
+      setImagePreview(null);
+      setImageDeleted(false);
+      setErrors({});
+    }
+  }, [isOpen]);
+
   // Set form data when asset prop changes
   useEffect(() => {
-    if (asset) {
+    if (asset && isOpen) {
       console.log("Setting form data from asset:", asset);
       setFormData({
         assetName: asset.assetName || '',
@@ -53,13 +65,18 @@ const EditAssetModal = ({ isOpen, onClose, onSuccess, asset }) => {
         workStationID: asset.workStationID || null
       });
       
+      // Reset all image state
+      setImage(null);
+      setImageDeleted(false);
+      
+      // Set image preview if asset has an image
       if (asset.imagePath) {
-        setImagePreview(`/uploads/assets/${asset.imagePath}`);
+        setImagePreview(`http://localhost:3001/uploads/assets/${asset.imagePath}`);
       } else {
         setImagePreview(null);
       }
     }
-  }, [asset]);
+  }, [asset, isOpen]);
 
   useEffect(() => {
     // Fetch models, categories, and employees when modal opens
@@ -106,6 +123,16 @@ const EditAssetModal = ({ isOpen, onClose, onSuccess, asset }) => {
     }
   };
 
+  // Updated close handler
+  const handleClose = () => {
+    // Reset all image-related state
+    setImage(null);
+    setImagePreview(null);
+    setImageDeleted(false);
+    setErrors({});
+    onClose();
+  };
+
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
     setFormData({
@@ -122,10 +149,31 @@ const EditAssetModal = ({ isOpen, onClose, onSuccess, asset }) => {
     }
   };
 
+  // Handle model change and auto-update category
+  const handleModelChange = (e) => {
+    const selectedModelID = e.target.value;
+    const selectedModel = models.find(model => model.modelID.toString() === selectedModelID);
+    
+    setFormData({
+      ...formData,
+      modelID: selectedModelID,
+      categoryID: selectedModel ? selectedModel.categoryID : formData.categoryID
+    });
+    
+    // Clear model error if exists
+    if (errors.modelID) {
+      setErrors({
+        ...errors,
+        modelID: null
+      });
+    }
+  };
+
   const handleImageChange = (e) => {
     const file = e.target.files[0];
     if (file) {
       setImage(file);
+      setImageDeleted(false); // Reset deletion flag when new image is selected
       // Create preview URL
       const reader = new FileReader();
       reader.onload = () => {
@@ -135,25 +183,41 @@ const EditAssetModal = ({ isOpen, onClose, onSuccess, asset }) => {
     }
   };
 
+  // Updated image removal handler
+  const handleImageRemove = () => {
+    setImage(null);
+    setImagePreview(null);
+    setImageDeleted(true); // Mark image for deletion
+    console.log('Image marked for deletion');
+  };
+
   const validateForm = () => {
     const newErrors = {};
     
-    if (!formData.assetName.trim()) newErrors.assetName = 'Asset name is required';
+    // Make these fields optional as per requirements
     if (!formData.assetTag.trim()) newErrors.assetTag = 'Asset tag is required';
-    if (!formData.serialNo.trim()) newErrors.serialNo = 'Serial number is required';
     if (!formData.modelID) newErrors.modelID = 'Model is required';
-    if (!formData.categoryID) newErrors.categoryID = 'Category is required';
     
     if (formData.isBorrowed) {
       if (!formData.borrowEmployeeID) newErrors.borrowEmployeeID = 'Employee is required for borrowed assets';
       if (!formData.borrowStartDate) newErrors.borrowStartDate = 'Start date is required';
       if (!formData.borrowEndDate) newErrors.borrowEndDate = 'End date is required';
+      
+      // Validate that end date is after start date
+      if (formData.borrowStartDate && formData.borrowEndDate) {
+        const startDate = new Date(formData.borrowStartDate);
+        const endDate = new Date(formData.borrowEndDate);
+        if (endDate <= startDate) {
+          newErrors.borrowEndDate = 'End date must be after start date';
+        }
+      }
     }
     
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
+  // Updated handleSubmit with image deletion support
   const handleSubmit = async (e) => {
     e.preventDefault();
     
@@ -162,33 +226,60 @@ const EditAssetModal = ({ isOpen, onClose, onSuccess, asset }) => {
     setLoading(true);
     
     try {
-      // Upload new image if there's one
-      let imagePath = asset.imagePath;
+      // Handle image logic
+      let newImagePath = null;
+      let shouldUpdateImage = false;
+      
       if (image) {
-        const formDataImage = new FormData();
-        formDataImage.append('image', image);
-        
-        console.log('Uploading new image...');
-        const imageRes = await axios.post('/api/assets/upload-image', formDataImage, {
-          headers: {
-            'Content-Type': 'multipart/form-data'
-          }
-        });
-        
-        imagePath = imageRes.data.path;
-        console.log('New image path:', imagePath);
+        // User uploaded a new image
+        try {
+          const formDataImage = new FormData();
+          formDataImage.append('image', image);
+          
+          console.log('Uploading new image...');
+          const imageRes = await axios.post('/api/assets/upload-image', formDataImage, {
+            headers: {
+              'Content-Type': 'multipart/form-data'
+            }
+          });
+          
+          newImagePath = imageRes.data.path;
+          shouldUpdateImage = true;
+          console.log('New image uploaded:', newImagePath);
+        } catch (imageError) {
+          console.error('Image upload error:', imageError);
+          setErrors({ general: `Image upload failed: ${imageError.response?.data?.error || imageError.message}` });
+          setLoading(false);
+          return;
+        }
+      } else if (imageDeleted) {
+        // User deleted the image
+        newImagePath = null;
+        shouldUpdateImage = true;
+        console.log('Image will be deleted from asset');
       }
       
-      // Update the asset
+      // Build payload
       const payload = {
         ...formData,
-        assetName: formData.assetName.trim(),
-        imagePath,
+        assetName: formData.assetName?.trim() || null,
+        serialNo: formData.serialNo?.trim() || null,
         isBorrowed: formData.isBorrowed ? 1 : 0,
         borrowStartDate: formData.isBorrowed ? formData.borrowStartDate : null,
         borrowEndDate: formData.isBorrowed ? formData.borrowEndDate : null,
+        borrowEmployeeID: formData.isBorrowed ? formData.borrowEmployeeID : null,
         workStationID: formData.workStationID || null
       };
+      
+      // Handle image update/deletion
+      if (shouldUpdateImage) {
+        payload.imagePath = newImagePath; // This will be null if deleting
+        payload.imageUpdated = true;
+        console.log('Image will be updated/deleted. New path:', newImagePath || 'DELETED');
+      } else {
+        payload.imageUpdated = false; // Keep existing image
+        console.log('Image will remain unchanged');
+      }
       
       console.log('Updating asset with payload:', payload);
       const response = await axios.put(`/api/assets/${asset.assetID}`, payload);
@@ -196,15 +287,23 @@ const EditAssetModal = ({ isOpen, onClose, onSuccess, asset }) => {
       
       setLoading(false);
       onSuccess(response.data);
-      onClose();
+      handleClose();
     } catch (error) {
       setLoading(false);
       console.error('Error updating asset:', error);
       
-      if (error.response && error.response.data && error.response.data.errors) {
-        setErrors(error.response.data.errors);
+      if (error.response && error.response.data) {
+        if (error.response.data.errors) {
+          setErrors(error.response.data.errors);
+        } else {
+          setErrors({ 
+            general: `Update failed: ${error.response.data.message || error.response.data.error || 'Unknown error'}` 
+          });
+        }
       } else {
-        setErrors({ general: 'Failed to update asset. Please try again.' });
+        setErrors({ 
+          general: `Update failed: ${error.message || 'Network error - please check your connection'}` 
+        });
       }
     }
   };
@@ -213,7 +312,7 @@ const EditAssetModal = ({ isOpen, onClose, onSuccess, asset }) => {
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-[#25424D] rounded-lg w-full max-w-2xl p-6 text-white">
+      <div className="bg-[#25424D] rounded-lg w-full max-w-4xl p-6 text-white max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-semibold flex items-center">
             <svg className="w-6 h-6 mr-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -224,7 +323,7 @@ const EditAssetModal = ({ isOpen, onClose, onSuccess, asset }) => {
             Edit Asset
           </h2>
           <button 
-            onClick={onClose}
+            onClick={handleClose}
             className="text-gray-400 hover:text-white"
           >
             <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -238,56 +337,30 @@ const EditAssetModal = ({ isOpen, onClose, onSuccess, asset }) => {
             {/* Left Column */}
             <div className="space-y-4">
               <div>
-                <label className="block text-gray-400 text-sm mb-1">Asset Name</label>
+                <label className="block text-gray-400 text-sm mb-1">Asset Name <span className="text-gray-500">(Optional)</span></label>
                 <input
                   type="text"
                   name="assetName"
                   value={formData.assetName}
                   onChange={handleChange}
-                  className={`w-full bg-[#1F3A45] rounded p-2 ${errors.assetName ? 'border border-red-500' : ''}`}
+                  className="w-full bg-[#1F3A45] rounded p-2"
                   placeholder="Enter asset name"
                 />
-                {errors.assetName && <p className="text-red-500 text-xs mt-1">{errors.assetName}</p>}
               </div>
               
               <div>
-                <label className="block text-gray-400 text-sm mb-1">Category</label>
-                <div className="relative">
-                  <select
-                    name="categoryID"
-                    value={formData.categoryID}
-                    onChange={handleChange}
-                    className={`w-full bg-[#1F3A45] rounded p-2 pr-8 appearance-none ${errors.categoryID ? 'border border-red-500' : ''}`}
-                  >
-                    <option value="">Select Category</option>
-                    {categories.map(category => (
-                      <option key={category.categoryID} value={category.categoryID}>
-                        {category.categoryName}
-                      </option>
-                    ))}
-                  </select>
-                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
-                    <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
-                    </svg>
-                  </div>
-                </div>
-                {errors.categoryID && <p className="text-red-500 text-xs mt-1">{errors.categoryID}</p>}
-              </div>
-              
-              <div>
-                <label className="block text-gray-400 text-sm mb-1">Model</label>
+                <label className="block text-gray-400 text-sm mb-1">Model <span className="text-red-400">*</span></label>
                 <div className="relative">
                   <select
                     name="modelID"
                     value={formData.modelID}
-                    onChange={handleChange}
+                    onChange={handleModelChange}
                     className={`w-full bg-[#1F3A45] rounded p-2 pr-8 appearance-none ${errors.modelID ? 'border border-red-500' : ''}`}
                   >
                     <option value="">Select Model</option>
                     {models.map(model => (
                       <option key={model.modelID} value={model.modelID}>
-                        {model.modelName}
+                        {model.modelName} - {model.manufacturerName || model.manufName} ({model.categoryType})
                       </option>
                     ))}
                   </select>
@@ -301,7 +374,7 @@ const EditAssetModal = ({ isOpen, onClose, onSuccess, asset }) => {
               </div>
               
               <div>
-                <label className="block text-gray-400 text-sm mb-1">Asset Tag</label>
+                <label className="block text-gray-400 text-sm mb-1">Asset Tag <span className="text-red-400">*</span></label>
                 <input
                   type="text"
                   name="assetTag"
@@ -314,16 +387,15 @@ const EditAssetModal = ({ isOpen, onClose, onSuccess, asset }) => {
               </div>
               
               <div>
-                <label className="block text-gray-400 text-sm mb-1">Serial No.</label>
+                <label className="block text-gray-400 text-sm mb-1">Serial No. <span className="text-gray-500">(Optional)</span></label>
                 <input
                   type="text"
                   name="serialNo"
                   value={formData.serialNo}
                   onChange={handleChange}
-                  className={`w-full bg-[#1F3A45] rounded p-2 ${errors.serialNo ? 'border border-red-500' : ''}`}
+                  className="w-full bg-[#1F3A45] rounded p-2"
                   placeholder="Enter serial number"
                 />
-                {errors.serialNo && <p className="text-red-500 text-xs mt-1">{errors.serialNo}</p>}
               </div>
             </div>
             
@@ -355,28 +427,29 @@ const EditAssetModal = ({ isOpen, onClose, onSuccess, asset }) => {
               <div>
                 <label className="block text-gray-400 text-sm mb-1">Image</label>
                 <div className="relative flex items-center justify-center bg-[#1F3A45] rounded border-dashed border-2 border-gray-500 p-4 h-28">
-                {imagePreview ? (
-                        <div className="relative w-full h-full flex items-center justify-center">
-                            <img 
-                            src={imagePreview.startsWith('data:') ? imagePreview : `http://localhost:3001/${imagePreview.split('/').pop()}`} 
-                            alt="Asset preview" 
-                            className="max-h-full max-w-full object-contain"
-                            />
-                            <button 
-                            type="button"
-                            onClick={() => {
-                                setImage(null);
-                                setImagePreview(null);
-                            }}
-                            className="absolute top-0 right-0 bg-red-500 text-white rounded-full p-1"
-                            >
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                            </button>
-                        </div>
-                     ) : (
-                        // Existing upload interface
+                  {imagePreview ? (
+                    <div className="relative w-full h-full flex items-center justify-center">
+                      <img 
+                        src={imagePreview} 
+                        alt="Asset preview" 
+                        className="max-h-full max-w-full object-contain"
+                        onError={(e) => {
+                          console.log("Image failed to load:", imagePreview);
+                          e.target.style.display = 'none';
+                        }}
+                      />
+                      <button 
+                        type="button"
+                        onClick={handleImageRemove} // Updated to use new handler
+                        className="absolute top-0 right-0 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
+                        title="Remove image"
+                      >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                  ) : (
                     <div className="text-center relative">
                       <svg className="mx-auto h-10 w-10 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -387,42 +460,23 @@ const EditAssetModal = ({ isOpen, onClose, onSuccess, asset }) => {
                       </p>
                       <input
                         type="file"
-                        accept="image/*"
+                        accept="image/png, image/jpeg"
                         onChange={handleImageChange}
                         className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                       />
                     </div>
                   )}
                 </div>
+                {imageDeleted && (
+                  <div className="mt-1 text-xs text-yellow-400 flex items-center">
+                    <svg className="w-3 h-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                    </svg>
+                    Image will be removed when you save
+                  </div>
+                )}
               </div>
 
-              {/* Workstation selection (if not borrowed) */}
-              {!formData.isBorrowed && (
-                <div>
-                  <label className="block text-gray-400 text-sm mb-1">Workstation (Optional)</label>
-                  <div className="relative">
-                    <select
-                      name="workStationID"
-                      value={formData.workStationID || ""}
-                      onChange={handleChange}
-                      className="w-full bg-[#1F3A45] rounded p-2 pr-8 appearance-none"
-                    >
-                      <option value="">None (Unassigned)</option>
-                      {workstations.map(ws => (
-                        <option key={ws.workStationID} value={ws.workStationID}>
-                          {ws.modelName}
-                        </option>
-                      ))}
-                    </select>
-                    <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
-                      <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
-                        <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
-                      </svg>
-                    </div>
-                  </div>
-                </div>
-              )}
-              
               <div className="pt-2">
                 <label className="flex items-center">
                   <input
@@ -432,25 +486,29 @@ const EditAssetModal = ({ isOpen, onClose, onSuccess, asset }) => {
                     onChange={handleChange}
                     className="form-checkbox h-4 w-4 text-blue-600"
                   />
-                  <span className="ml-2 text-sm">Borrow</span>
+                  <span className="ml-2 text-sm">Borrow Asset</span>
                 </label>
               </div>
               
               {formData.isBorrowed && (
-                <div className="space-y-3">
+                <div className="space-y-3 bg-[#1F3A45] p-3 rounded">
+                  <div className="text-sm font-medium text-gray-300 border-b border-gray-600 pb-2 mb-3">
+                    Borrow Details
+                  </div>
+                  
                   <div>
-                    <label className="block text-gray-400 text-xs mb-1">To</label>
+                    <label className="block text-gray-400 text-xs mb-1">Borrow To <span className="text-red-400">*</span></label>
                     <div className="relative">
                       <select
                         name="borrowEmployeeID"
                         value={formData.borrowEmployeeID}
                         onChange={handleChange}
-                        className={`w-full bg-[#1F3A45] rounded p-2 pr-8 appearance-none ${errors.borrowEmployeeID ? 'border border-red-500' : ''}`}
+                        className={`w-full bg-[#13232c] rounded p-2 pr-8 appearance-none ${errors.borrowEmployeeID ? 'border border-red-500' : ''}`}
                       >
                         <option value="">Select Employee</option>
                         {employees.map(employee => (
                           <option key={employee.empID} value={employee.empID}>
-                            {`${employee.empFirstName} ${employee.empLastName}`}
+                            {`${employee.empFirstName} ${employee.empLastName} - ${employee.empCode || employee.empID}`}
                           </option>
                         ))}
                       </select>
@@ -465,29 +523,40 @@ const EditAssetModal = ({ isOpen, onClose, onSuccess, asset }) => {
                   
                   <div className="grid grid-cols-2 gap-2">
                     <div>
-                      <label className="block text-gray-400 text-xs mb-1">From</label>
+                      <label className="block text-gray-400 text-xs mb-1">From Date <span className="text-red-400">*</span></label>
                       <input
                         type="date"
                         name="borrowStartDate"
                         value={formData.borrowStartDate}
                         onChange={handleChange}
-                        className={`w-full bg-[#1F3A45] rounded p-2 ${errors.borrowStartDate ? 'border border-red-500' : ''}`}
+                        className={`w-full bg-[#13232c] rounded p-2 ${errors.borrowStartDate ? 'border border-red-500' : ''}`}
                       />
                       {errors.borrowStartDate && <p className="text-red-500 text-xs mt-1">{errors.borrowStartDate}</p>}
                     </div>
                     
                     <div>
-                      <label className="block text-gray-400 text-xs mb-1">Until</label>
+                      <label className="block text-gray-400 text-xs mb-1">Until Date <span className="text-red-400">*</span></label>
                       <input
                         type="date"
                         name="borrowEndDate"
                         value={formData.borrowEndDate}
                         onChange={handleChange}
-                        className={`w-full bg-[#1F3A45] rounded p-2 ${errors.borrowEndDate ? 'border border-red-500' : ''}`}
+                        className={`w-full bg-[#13232c] rounded p-2 ${errors.borrowEndDate ? 'border border-red-500' : ''}`}
                       />
                       {errors.borrowEndDate && <p className="text-red-500 text-xs mt-1">{errors.borrowEndDate}</p>}
                     </div>
                   </div>
+                  
+                  {formData.borrowEmployeeID && formData.borrowStartDate && formData.borrowEndDate && (
+                    <div className="mt-3 p-2 bg-[#13232c] rounded text-xs">
+                      <div className="text-gray-300 font-medium mb-1">Borrow Summary:</div>
+                      <div className="text-gray-400">
+                        <div>Employee: {employees.find(emp => emp.empID.toString() === formData.borrowEmployeeID)?.empFirstName} {employees.find(emp => emp.empID.toString() === formData.borrowEmployeeID)?.empLastName}</div>
+                        <div>Period: {formData.borrowStartDate} to {formData.borrowEndDate}</div>
+                        <div>Duration: {Math.ceil((new Date(formData.borrowEndDate) - new Date(formData.borrowStartDate)) / (1000 * 60 * 60 * 24))} days</div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -510,7 +579,7 @@ const EditAssetModal = ({ isOpen, onClose, onSuccess, asset }) => {
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
-              ) : 'Update'}
+              ) : 'Update Asset'}
             </button>
           </div>
         </form>

@@ -116,7 +116,7 @@ const Assets = () => {
         .filter(asset => selectedItems.includes(asset.assetID) && asset.workStationID !== null);
       
       if (assignedAssets.length > 0) {
-        const assetNames = assignedAssets.map(asset => asset.assetName).join(', ');
+        const assetNames = assignedAssets.map(asset => asset.assetName || asset.assetTag).join(', ');
         setError(`Cannot delete assigned assets: ${assetNames}. Please unassign these assets first.`);
         return;
       }
@@ -151,7 +151,7 @@ const Assets = () => {
     const asset = assets.find(a => a.assetID === id);
     
     if (asset && asset.workStationID !== null) {
-      setError(`Cannot delete assigned asset: ${asset.assetName}. Please unassign this asset first.`);
+      setError(`Cannot delete assigned asset: ${asset.assetName || asset.assetTag}. Please unassign this asset first.`);
       return;
     }
     
@@ -216,7 +216,7 @@ const Assets = () => {
       asset.assetTag?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       asset.serialNo?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       asset.modelName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      asset.categoryName?.toLowerCase().includes(searchTerm.toLowerCase())
+      asset.categoryType?.toLowerCase().includes(searchTerm.toLowerCase())
     );
     
     // Category filter
@@ -276,14 +276,16 @@ const Assets = () => {
   const exportToCSV = () => {
     // Prepare data for export
     const csvData = filteredAssets.map(asset => ({
-      'Asset Name': asset.assetName || '',
+      'Asset Name': asset.assetName || 'N/A',
       'Asset Tag': asset.assetTag || '',
-      'Serial Number': asset.serialNo || '',
-      'Category': asset.categoryName || '',
+      'Serial Number': asset.serialNo || 'N/A',
+      'Category': asset.categoryType || '',
       'Model': asset.modelName || '',
       'Status': asset.assetStatus || '',
       'Assigned To': asset.empFirstName && asset.empLastName ? `${asset.empFirstName} ${asset.empLastName}` : 'Not Assigned',
       'Workstation': asset.workstationName || 'None',
+      'Borrowed To': asset.borrowEmployeeName || 'None',
+      'Borrow Period': asset.borrowStartDate && asset.borrowEndDate ? `${formatDate(asset.borrowStartDate)} - ${formatDate(asset.borrowEndDate)}` : 'N/A',
       'Date Added': formatDate(asset.created_at)
     }));
     
@@ -309,14 +311,23 @@ const Assets = () => {
     URL.revokeObjectURL(url);
   };
 
-  // Check if selected assets are assignable (not already assigned)
+  // Check if selected assets are assignable (not already assigned or borrowed)
   const checkAssignableAssets = () => {
     const assignedAssets = assets
       .filter(asset => selectedItems.includes(asset.assetID) && asset.workStationID !== null);
     
+    const borrowedAssets = assets
+      .filter(asset => selectedItems.includes(asset.assetID) && asset.assetStatus === 'Borrowed');
+    
     if (assignedAssets.length > 0) {
-      const assetNames = assignedAssets.map(asset => asset.assetName).join(', ');
+      const assetNames = assignedAssets.map(asset => asset.assetName || asset.assetTag).join(', ');
       setError(`Cannot assign these assets because they are already assigned: ${assetNames}. Please unassign these assets first.`);
+      return false;
+    }
+    
+    if (borrowedAssets.length > 0) {
+      const assetNames = borrowedAssets.map(asset => asset.assetName || asset.assetTag).join(', ');
+      setError(`Cannot assign borrowed assets: ${assetNames}. Please return these assets first or change status to 'Ready to Deploy'.`);
       return false;
     }
     
@@ -578,7 +589,7 @@ const Assets = () => {
                   <option value="">All Categories</option>
                   {categories.map(category => (
                     <option key={category.categoryID} value={category.categoryID}>
-                      {category.categoryName}
+                      {category.categoryType}
                     </option>
                   ))}
                 </select>
@@ -697,7 +708,7 @@ const Assets = () => {
               <div>Model</div>
               <div>Category</div>
               <div>Status</div>
-              <div>Assigned</div>
+              <div>Workstation</div>
               <div className="text-center">Actions</div>
             </div>
             
@@ -721,10 +732,21 @@ const Assets = () => {
                     />
                   </div>
                   <div>
-                    {asset.assetName}
+                    {asset.assetName || <span className="text-gray-400 italic">No name</span>}
                     {asset.workStationID && asset.empFirstName && (
-                      <div className="text-xs text-gray-400 mt-1">
-                        Assigned to: {asset.empFirstName} {asset.empLastName}
+                      <div className="text-xs text-green-400 mt-1">
+                        <svg className="w-3 h-3 inline mr-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        {asset.empFirstName} {asset.empLastName}
+                      </div>
+                    )}
+                    {asset.borrowEmployeeID && asset.borrowStartDate && (
+                      <div className="text-xs text-orange-400 mt-1">
+                        <svg className="w-3 h-3 inline mr-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path>
+                        </svg>
+                        Borrowed by {asset.borrowEmployeeName} ({formatDate(asset.borrowStartDate)} - {formatDate(asset.borrowEndDate)})
                       </div>
                     )}
                   </div>
@@ -732,8 +754,8 @@ const Assets = () => {
                   {asset.imagePath ? (
                     <div className="w-10 h-10 rounded overflow-hidden bg-[#1F3A45] flex items-center justify-center">
                       <img 
-                        src={`http://localhost:3001/uploads/assets/${asset.imagePath.split('\\').pop()}`} 
-                        alt={asset.assetName || "Asset"} 
+                        src={`http://localhost:3001/uploads/assets/${asset.imagePath}`} 
+                        alt={asset.assetName || asset.assetTag || "Asset"} 
                         className="w-full h-full object-contain"
                         onError={(e) => {
                           console.log("Image failed to load:", asset.imagePath);
@@ -752,9 +774,9 @@ const Assets = () => {
                   )}
                   </div>
                   <div>{asset.assetTag}</div>
-                  <div>{asset.serialNo}</div>
+                  <div>{asset.serialNo || <span className="text-gray-400 italic">No serial</span>}</div>
                   <div>{asset.modelName || 'N/A'}</div>
-                  <div>{asset.categoryName || 'N/A'}</div>
+                  <div>{asset.categoryType || 'N/A'}</div>
                   <div className="flex items-center gap-2">
                     <div className={`w-3 h-3 rounded-full ${getStatusColorClass(asset.assetStatus)}`}></div>
                     <span>{asset.assetStatus}</span>
@@ -763,16 +785,25 @@ const Assets = () => {
                     {asset.workStationID ? (
                       <div className="flex items-center text-green-400">
                         <svg className="w-4 h-4 mr-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                          <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                          <line x1="8" y1="21" x2="16" y2="21"></line>
+                          <line x1="12" y1="17" x2="12" y2="21"></line>
                         </svg>
-                        <span>Yes</span>
+                        <div>
+                          <div className="text-sm font-medium">{asset.workstationName || `WS-${asset.workStationID}`}</div>
+                          {asset.empFirstName && asset.empLastName && (
+                            <div className="text-xs text-gray-400">
+                              {asset.empFirstName} {asset.empLastName}
+                            </div>
+                          )}
+                        </div>
                       </div>
                     ) : (
                       <div className="flex items-center text-gray-400">
                         <svg className="w-4 h-4 mr-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                           <path d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                         </svg>
-                        <span>No</span>
+                        <span className="text-sm">Unassigned</span>
                       </div>
                     )}
                   </div>
