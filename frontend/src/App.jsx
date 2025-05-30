@@ -17,6 +17,9 @@ import ManageAssetModal from './components/ManageAssetsModal';
 import AssignEmployeeModal from './components/AssignEmployeeModal';
 import Departments from './pages/Department';
 import Company from './pages/Company';
+import ActivityLogs from './pages/ActivityLogs';
+import BackupRestore from './pages/BackupRestore';
+import AboutUs from './pages/AboutUs';
 
 
 
@@ -42,6 +45,9 @@ function App() {
         <Route path="/assignemployee" element={<AssignEmployeeModal />} />
         <Route path="/department" element={<Departments />} />
         <Route path="/company" element={<Company />} />
+        <Route path="/activitylogs" element={<ActivityLogs />} />
+        <Route path="/backup-restore" element={<BackupRestore />} />
+        <Route path="/aboutus" element={<AboutUs />} />
 
       </Routes>
     </Router>

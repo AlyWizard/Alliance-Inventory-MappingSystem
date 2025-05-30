@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import AccountCreationConfirmation from '../modal/AccountCreationConfirmation';
 import axios from 'axios';
 
 // AccountModal component that matches your design
@@ -16,6 +17,7 @@ const AccountModal = ({ isOpen, onClose }) => {
   const currentUser = JSON.parse(localStorage.getItem('currentUser'));
   const [isEditing, setIsEditing] = useState(false);
   const [editingUserId, setEditingUserId] = useState(null);
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -160,7 +162,9 @@ const AccountModal = ({ isOpen, onClose }) => {
               <h2 className="text-2xl font-bold">{isEditing ? 'Edit Account' : 'Account Creation'}</h2>
             </div>
             
-            <form onSubmit={handleSubmit}>
+            <form
+              onSubmit={isEditing ? handleSubmit : (e) => e.preventDefault()}
+            >
               <div className="mb-4">
                 <label className="block text-gray-400 mb-2">Username</label>
                 <input
@@ -210,19 +214,29 @@ const AccountModal = ({ isOpen, onClose }) => {
               </div>
               
               <div className="mt-8">
-                <button
-                  type="submit"
-                  className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-6 rounded-full transition duration-200"
-                >
-                  {isEditing ? 'Edit Account' : 'Add Account'}
-                </button>
-                {isEditing && (
+                {isEditing ? (
+                  <>
+                    <button
+                      type="submit"
+                      className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-6 rounded-full transition duration-200"
+                    >
+                      Edit Account
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleDeleteAccount}
+                      className="ml-4 bg-red-500 hover:bg-red-600 text-white font-bold py-3 px-6 rounded-full transition duration-200"
+                    >
+                      Delete Account
+                    </button>
+                  </>
+                ) : (
                   <button
                     type="button"
-                    onClick={handleDeleteAccount}
-                    className="ml-4 bg-red-500 hover:bg-red-600 text-white font-bold py-3 px-6 rounded-full transition duration-200"
+                    onClick={() => setIsConfirmOpen(true)}
+                    className="bg-[#0075A2] hover:bg-[#0088BC] text-white py-2 px-6 rounded-md"
                   >
-                    Delete Account
+                    Add Account
                   </button>
                 )}
               </div>
@@ -281,6 +295,16 @@ const AccountModal = ({ isOpen, onClose }) => {
           ✕
         </button>
       </div>
+      {/* Confirmation Modal for Account Creation */}
+      <AccountCreationConfirmation
+        isOpen={isConfirmOpen}
+        onClose={() => setIsConfirmOpen(false)}
+        onConfirm={() => {
+          setIsConfirmOpen(false);
+          // Simulate form submission event
+          handleSubmit({ preventDefault: () => {} });
+        }}
+      />
     </div>
   );
 };

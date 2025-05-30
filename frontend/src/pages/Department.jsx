@@ -248,7 +248,7 @@ const Department = () => {
               className="bg-[#13232c] border border-[#273C45] rounded-md w-8 h-8 flex items-center justify-center"
               onClick={fetchDepartments}
             >
-              <FaSyncAlt className="w-4 h-4" />
+              <FaSyncAlt className="w-2 h-2" />
             </button>
             
             <button 

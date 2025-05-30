@@ -209,12 +209,16 @@ const FloorMap = ({ forceMapUpdate }) => {
           let color = colors.unassigned;
           let isITEquipment = false;
           
+          const wsData = findMatchingWorkstation(id);
+
           // IT Equipment is BLUE  Add more here for ESC check Datacell id na naka embed sa floorMap
-          if (id.startsWith('SVR') || id === 'SVR02' || id === 'SVR001' || 
+          if ( wsData?.isITEquipment ||
+              id.startsWith('SVR') || id === 'SVR02' || id === 'SVR001' || 
               id.startsWith('BR') || id === 'BR01' || id === 'WSM090') {
             color = colors.it_equipment;
             isITEquipment = true;
-          } else {
+            
+          } else if (wsData) {
             // Otherwise, check workstation status
             const wsData = findMatchingWorkstation(id);
             

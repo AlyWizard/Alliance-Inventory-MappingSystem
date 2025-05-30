@@ -7,7 +7,7 @@ const bcrypt = require('bcryptjs');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
-
+const { exec } = require('child_process');
 const app = express();
 
 // Configure multer for file uploads
@@ -1832,7 +1832,7 @@ app.get('/api/assets/available', async (req, res) => {
   }
 });
 
-// Transfer assets between workstations
+// Transfer assets between workstations  
 app.post('/api/assets/transfer', async (req, res) => {
   try {
     const { assetIds, fromWorkstationId, toWorkstationId, assetStatus } = req.body;
@@ -2146,58 +2146,6 @@ app.post('/api/workstations', async (req, res) => {
   }
 });
 
-// Update a workstation
-app.put('/api/workstations/:id', async (req, res) => {
-  try {
-    const { modelName, empID } = req.body;
-    const workstationId = req.params.id;
-    
-    // Validate required fields
-    if (!modelName) {
-      return res.status(400).json({ error: 'Workstation name is required' });
-    }
-    
-    if (!empID) {
-      return res.status(400).json({ error: 'Employee ID is required' });
-    }
-    
-    // Check if workstation exists
-    const [workstations] = await db.query('SELECT * FROM workstations WHERE workStationID = ?', [workstationId]);
-    if (workstations.length === 0) {
-      return res.status(404).json({ error: 'Workstation not found' });
-    }
-    
-    const currentWorkstation = workstations[0];
-    
-    // Check if employee exists
-    const [employees] = await db.query('SELECT * FROM employees WHERE empID = ?', [empID]);
-    if (employees.length === 0) {
-      return res.status(404).json({ error: 'Employee not found' });
-    }
-    
-    // Update workstation
-    await db.query(`
-      UPDATE workstations
-      SET modelName = ?, empID = ?, updated_at = NOW()
-      WHERE workStationID = ?
-    `, [modelName, empID, workstationId]);
-    
-    // Get updated workstation with related data
-    const [updatedWorkstation] = await db.query(`
-      SELECT w.*, 
-             e.empFirstName, e.empLastName, e.empUserName, e.empDept,
-             (SELECT COUNT(*) FROM assets a WHERE a.workStationID = w.workStationID) as assetCount
-      FROM workstations w
-      LEFT JOIN employees e ON w.empID = e.empID
-      WHERE w.workStationID = ?
-    `, [workstationId]);
-    
-    res.json(updatedWorkstation[0]);
-  } catch (error) {
-    console.error('Error updating workstation:', error);
-    res.status(500).json({ error: 'Failed to update workstation' });
-  }
-});
 
 // Delete a workstation
 app.delete('/api/workstations/:id', async (req, res) => {
@@ -2400,40 +2348,18 @@ app.post('/api/workstations', async (req, res) => {
 // Update a workstation
 app.put('/api/workstations/:id', async (req, res) => {
   try {
-    const { modelName, empID } = req.body;
+    const { empID, modelName, isITEquipment } = req.body; // Add isITEquipment field
     const workstationId = req.params.id;
     
-    // Validate required fields
-    if (!modelName) {
-      return res.status(400).json({ error: 'Workstation name is required' });
-    }
+    // FIXED: Allow empID to be null, undefined, or 0 for unassignment
+    const finalEmpID = (empID === null || empID === undefined || empID === 0 || empID === '') ? null : empID;
     
-    if (!empID) {
-      return res.status(400).json({ error: 'Employee ID is required' });
-    }
+    await db.query(
+      'UPDATE workstations SET empID = ?, modelName = ?, isITEquipment = ?, updated_at = NOW() WHERE workStationID = ?',
+      [finalEmpID, modelName, isITEquipment || 0, workstationId]
+    );
     
-    // Check if workstation exists
-    const [workstations] = await db.query('SELECT * FROM workstations WHERE workStationID = ?', [workstationId]);
-    if (workstations.length === 0) {
-      return res.status(404).json({ error: 'Workstation not found' });
-    }
-    
-    const currentWorkstation = workstations[0];
-    
-    // Check if employee exists
-    const [employees] = await db.query('SELECT * FROM employees WHERE empID = ?', [empID]);
-    if (employees.length === 0) {
-      return res.status(404).json({ error: 'Employee not found' });
-    }
-    
-    // Update workstation
-    await db.query(`
-      UPDATE workstations
-      SET modelName = ?, empID = ?, updated_at = NOW()
-      WHERE workStationID = ?
-    `, [modelName, empID, workstationId]);
-    
-    // Get updated workstation with related data
+    // Get updated workstation data
     const [updatedWorkstation] = await db.query(`
       SELECT w.*, 
              e.empFirstName, e.empLastName, e.empUserName, e.empDept,

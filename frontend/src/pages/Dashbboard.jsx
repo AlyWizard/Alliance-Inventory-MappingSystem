@@ -2,6 +2,12 @@ import React, { useState, useEffect } from 'react';
 import FloorMap from '../components/FloorMap';  // Use original component name
 import WorkstationAssignModal from '../components/WorkstationAssignModal';
 import escLogo from '../assets/allianceLogo.png';
+import AccountModal from '../components/modal/AccountCreation';
+import CreateNewModal from '../components/modal/CreateNewModal';
+import LogoutConfirmation from '../components/modal/LogoutConfirmation';
+
+
+
 
 function Dashboard() {
   const [isWorkstationModalOpen, setIsWorkstationModalOpen] = useState(false);
@@ -9,6 +15,9 @@ function Dashboard() {
   const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
   const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
   const [forceMapUpdate, setForceMapUpdate] = useState(0); // Add state to force FloorMap to update
+  // Account Creation Modal state
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
   // Listen for custom events from FloorMap component
   useEffect(() => {
@@ -53,12 +62,13 @@ function Dashboard() {
         {/* Left Sidebar */}
         <aside className="w-54 min-h-screen max-h-screen flex-shrink-0 bg-[#16282F] p-4 flex flex-col flex">
           {/* Logo */}
-          <div className="rounded flex items-center justify-center">
-            <img src={escLogo} alt="ESC Logo" className="h-30 w-40"/>
+          <div className="ml-8 flex items-center gap-2 mb-6">
+            <div className="w-50 h-12 rounded flex items-center justify-center">
+              <img src={escLogo} alt="ASCL Logo" className="h-30 w-40"/>
+            </div>
           </div>
-
           {/* Mapping Section */}
-          <div className="bg-[#1c3640] rounded-md p-3 mb-4" style={{ width: '220px', height: '190px' }}>
+          <div className="bg-[#1c3640] rounded-md p-3 mb-4" style={{ width: '235px', height: '190px' }}>
             <button className="bg-[#41b853] text-white px-4 py-2 w-full rounded mb-3 font-semibold">
                 Floor Mapping
             </button>
@@ -87,6 +97,14 @@ function Dashboard() {
             <h2 className="text-lg mb-2">Inventories</h2>
             <div className="bg-[#1c3640] rounded-md p-3">
               <div className="space-y-2">
+                <div className="flex items-center gap-3 hover:bg-opacity-10 hover:bg-white p-2 rounded cursor-pointer" onClick={() => window.location.href = '/company'}>
+                  <span className="text-gray-400">🏢</span>
+                  <span>Companies</span>
+                </div>
+                <div className="flex items-center gap-3 hover:bg-opacity-10 hover:bg-white p-2 rounded cursor-pointer" onClick={() => window.location.href = '/department'}>
+                  <span className="text-gray-400">👔</span>
+                  <span>Departments</span>
+                </div>
                 <div className="flex items-center gap-3 hover:bg-opacity-10 hover:bg-white p-2 rounded cursor-pointer" onClick={() => window.location.href = '/employees'}>
                   <span className="text-gray-400">👤</span>
                   <span>Employees</span>
@@ -107,47 +125,42 @@ function Dashboard() {
                   <span className="text-gray-400">📦</span>
                   <span>Assets</span>
                 </div>
+                 <div className="flex items-center gap-3 hover:bg-opacity-10 hover:bg-white p-2 rounded cursor-pointer" onClick={() => window.location.href = '/assets'}>
+                  <span className="text-gray-400">📦</span>
+                  <span>Workstation</span>
+                </div>
               </div>
             </div>
           </div>
 
           {/* Others Section */}
-          <div className="">
+          <div className="mt-auto">
             <div className="flex space-x-2 mb-4">
-              <div className="bg-[#1c3640] py-1 px-2 rounded flex-1 flex items-center justify-center flex-col">
+              <button 
+                onClick={() => window.location.href = '/activitylogs'}
+                className="bg-[#1c3640] py-1 px-2 rounded flex-1 flex items-center justify-center flex-col hover:bg-[#2a4a56] transition">
                 <span className="text-base mb-1 leading-none">📊</span>
                 <span className="text-[0.65rem] leading-tight">Reports</span>
-              </div>
-              <div className="bg-[#1c3640] py-1 px-2 rounded flex-1 flex items-center justify-center flex-col">
+              </button>
+              <div
+                className="bg-[#1c3640] py-1 px-2 rounded flex-1 flex items-center justify-center flex-col cursor-pointer"
+                onClick={() => navigate('/backup-restore')}
+              >
                 <span className="text-base mb-1 leading-none">💾</span>
-                <span className="text-[0.65rem] leading-tight">Backup</span>
+                <span className="text-[0.55rem] leading-tight">Backup & Restore</span>
               </div>
             </div>
-            
+
             {/* Divider between About/Logout and Assets */}
             <div className="h-1 bg-[#273C45] my-2"></div>
 
-            <div className="bg-[#1c3640] py-1 px-2 rounded flex-1 flex items-center justify-center flex-col">
-              <span className="text-base mb-1 leading-none">💾</span>
-              <span className="text-[0.65rem] leading-tight">Backup</span>
-            </div>
-          
             <button
-              onClick={() => setIsAccountModalOpen(true)}
+              onClick={() => setIsModalOpen(true)}
               className="bg-[#162F20] text-white py-3 px-4 rounded-xl text-sm font-semibold w-full mt-4 border-4"
               style={{ borderColor: '#4D8D36' }}
             >
               Account Creation
             </button>
-
-            <button
-              onClick={() => setIsLogoutModalOpen(true)}
-              className="bg-[#162F20] text-white py-3 px-4 rounded-xl text-sm font-semibold w-full mt-4 border-4"
-              style={{ borderColor: '#4D8D36' }}
-            >
-              Logout
-            </button>
-
           </div>
         </aside>
 
@@ -265,6 +278,27 @@ function Dashboard() {
           isOpen={isWorkstationModalOpen}
           onClose={handleCloseModal}
           workstationId={selectedWorkstation}
+        />
+      )}
+            {/* Account Creation Modal */}
+      {isModalOpen && (
+        <AccountModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
+      )}
+
+      {/* Create New Modal */}
+      <CreateNewModal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+      />
+      {/* Logout Confirmation Modal */}
+      {isLogoutModalOpen && (
+        <LogoutConfirmation
+          isOpen={isLogoutModalOpen}
+          onClose={() => setIsLogoutModalOpen(false)}
+          onConfirm={() => {
+            setIsLogoutModalOpen(false);
+            navigate('/');
+          }}
         />
       )}
     </div>

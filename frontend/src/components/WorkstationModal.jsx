@@ -30,7 +30,7 @@ const WorkstationModal = ({ isOpen, onClose, workstationId }) => {
         ...response.data,
         assets: assetsResponse.data
       };
-      
+      //Hello world
       setWorkstationData(combinedData);
       setError(null);
     } catch (err) {

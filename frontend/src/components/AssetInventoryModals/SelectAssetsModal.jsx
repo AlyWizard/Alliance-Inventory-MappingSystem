@@ -27,8 +27,17 @@ const SelectAssetsModal = ({ isOpen, onClose, employeeId, onSuccess }) => {
   // State for asset status after assignment
   const [assetStatus, setAssetStatus] = useState('Onsite');
   
-  // Status options with their corresponding colors
+  // Status options with their corresponding colors (excluding borrowed since we can't assign borrowed assets)
   const statusOptions = [
+    { value: 'Ready to Deploy', color: 'bg-green-500' },
+    { value: 'Onsite', color: 'bg-blue-400' },
+    { value: 'WFH', color: 'bg-cyan-400' },
+    { value: 'Temporarily Deployed', color: 'bg-pink-500' },
+    { value: 'Defective', color: 'bg-red-500' }
+  ];
+
+  // Available status options for filtering (including borrowed so user can see why assets are excluded)
+  const filterStatusOptions = [
     { value: 'Ready to Deploy', color: 'bg-green-500' },
     { value: 'Onsite', color: 'bg-blue-400' },
     { value: 'WFH', color: 'bg-cyan-400' },
@@ -53,19 +62,32 @@ const SelectAssetsModal = ({ isOpen, onClose, employeeId, onSuccess }) => {
         assetStatus: ''
       });
       setShowFilters(false);
+      setError(null);
     }
   }, [isOpen, employeeId]);
   
-  // Fetch available (unassigned) assets from API
+  // Fetch available (unassigned and non-borrowed) assets from API
   const fetchAvailableAssets = async () => {
     setLoading(true);
     try {
       const response = await axios.get('/api/assets');
-      // Filter assets that are not assigned to any workstation
-      const unassignedAssets = response.data.filter(asset => 
-        asset.workStationID === null
-      );
-      setAvailableAssets(unassignedAssets);
+      console.log('All assets:', response.data);
+      
+      // Filter assets that are:
+      // 1. Not assigned to any workstation (workStationID === null)
+      // 2. Not borrowed (assetStatus !== 'Borrowed' AND isBorrowed !== true)
+      // 3. Not defective (optional - you might want to allow defective assets to be assigned for repair)
+      const assignableAssets = response.data.filter(asset => {
+        const isUnassigned = asset.workStationID === null;
+        const isNotBorrowed = asset.assetStatus !== 'Borrowed' && !asset.isBorrowed;
+        
+        console.log(`Asset ${asset.assetTag}: unassigned=${isUnassigned}, notBorrowed=${isNotBorrowed}, status=${asset.assetStatus}, isBorrowed=${asset.isBorrowed}`);
+        
+        return isUnassigned && isNotBorrowed;
+      });
+      
+      console.log('Assignable assets:', assignableAssets);
+      setAvailableAssets(assignableAssets);
       setError(null);
     } catch (err) {
       console.error('Error fetching available assets:', err);
@@ -111,14 +133,38 @@ const SelectAssetsModal = ({ isOpen, onClose, employeeId, onSuccess }) => {
       return;
     }
     
+    // Validate that selected assets are still assignable
+    const selectedAssetDetails = availableAssets.filter(asset => 
+      selectedAssets.includes(asset.assetID)
+    );
+    
+    const borrowedSelected = selectedAssetDetails.filter(asset => 
+      asset.assetStatus === 'Borrowed' || asset.isBorrowed
+    );
+    
+    const assignedSelected = selectedAssetDetails.filter(asset => 
+      asset.workStationID !== null
+    );
+    
+    if (borrowedSelected.length > 0) {
+      setError(`Cannot assign borrowed assets: ${borrowedSelected.map(a => a.assetTag).join(', ')}`);
+      return;
+    }
+    
+    if (assignedSelected.length > 0) {
+      setError(`Cannot assign already assigned assets: ${assignedSelected.map(a => a.assetTag).join(', ')}`);
+      return;
+    }
+    
     setLoading(true);
     try {
-      // Just return the selected assets with status - let parent handle workstation assignment
       const assignmentData = {
         selectedAssetIds: selectedAssets,
         assetStatus: assetStatus,
         employeeId: employeeId
       };
+      
+      console.log('Assignment data:', assignmentData);
       
       if (onSuccess) {
         onSuccess(assignmentData);
@@ -160,7 +206,7 @@ const SelectAssetsModal = ({ isOpen, onClose, employeeId, onSuccess }) => {
       asset.assetTag?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       asset.serialNo?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       asset.modelName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      asset.categoryName?.toLowerCase().includes(searchTerm.toLowerCase())
+      asset.categoryType?.toLowerCase().includes(searchTerm.toLowerCase())
     );
     
     // Category filter
@@ -180,7 +226,7 @@ const SelectAssetsModal = ({ isOpen, onClose, employeeId, onSuccess }) => {
   
   // Get status color class
   const getStatusColorClass = (status) => {
-    const statusOption = statusOptions.find(option => option.value === status);
+    const statusOption = filterStatusOptions.find(option => option.value === status);
     return statusOption ? statusOption.color : 'bg-gray-500';
   };
   
@@ -226,6 +272,9 @@ const SelectAssetsModal = ({ isOpen, onClose, employeeId, onSuccess }) => {
                 </option>
               ))}
             </select>
+            <p className="text-xs text-gray-400 mt-1">
+              Note: Only unassigned and non-borrowed assets are shown for assignment
+            </p>
           </div>
           
           <div className="flex justify-between items-center mt-4">
@@ -281,7 +330,7 @@ const SelectAssetsModal = ({ isOpen, onClose, employeeId, onSuccess }) => {
                     <option value="">All Categories</option>
                     {categories.map(category => (
                       <option key={category.categoryID} value={category.categoryID}>
-                        {category.categoryName}
+                        {category.categoryType}
                       </option>
                     ))}
                   </select>
@@ -313,7 +362,7 @@ const SelectAssetsModal = ({ isOpen, onClose, employeeId, onSuccess }) => {
                     className="w-full bg-[#1F3A45] rounded p-2 appearance-none"
                   >
                     <option value="">All Statuses</option>
-                    {statusOptions.map(status => (
+                    {filterStatusOptions.map(status => (
                       <option key={status.value} value={status.value}>
                         {status.value}
                       </option>
@@ -342,7 +391,13 @@ const SelectAssetsModal = ({ isOpen, onClose, employeeId, onSuccess }) => {
               <svg className="w-16 h-16 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
               </svg>
-              <p>No unassigned assets found matching your criteria.</p>
+              <p className="text-center">
+                No assignable assets found matching your criteria.
+                <br />
+                <span className="text-sm">
+                  (Borrowed and already assigned assets are excluded)
+                </span>
+              </p>
             </div>
           ) : (
             <table className="min-w-full">
@@ -381,7 +436,7 @@ const SelectAssetsModal = ({ isOpen, onClose, employeeId, onSuccess }) => {
                         onClick={(e) => e.stopPropagation()}
                       />
                     </td>
-                    <td className="py-3 px-4 font-medium">{asset.assetName}</td>
+                    <td className="py-3 px-4 font-medium">{asset.assetName || 'N/A'}</td>
                     <td className="py-3 px-4">
                       {asset.imagePath ? (
                         <div className="w-10 h-10 rounded overflow-hidden bg-[#1F3A45] flex items-center justify-center">
@@ -405,9 +460,9 @@ const SelectAssetsModal = ({ isOpen, onClose, employeeId, onSuccess }) => {
                       )}
                     </td>
                     <td className="py-3 px-4">{asset.assetTag}</td>
-                    <td className="py-3 px-4">{asset.serialNo}</td>
-                    <td className="py-3 px-4">{asset.modelName}</td>
-                    <td className="py-3 px-4">{asset.categoryName}</td>
+                    <td className="py-3 px-4">{asset.serialNo || 'N/A'}</td>
+                    <td className="py-3 px-4">{asset.modelName || 'N/A'}</td>
+                    <td className="py-3 px-4">{asset.categoryType || 'N/A'}</td>
                     <td className="py-3 px-4">
                       <div className="flex items-center gap-2">
                         <div className={`w-3 h-3 rounded-full ${getStatusColorClass(asset.assetStatus)}`}></div>
@@ -438,7 +493,7 @@ const SelectAssetsModal = ({ isOpen, onClose, employeeId, onSuccess }) => {
                 <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
                 <span>Processing...</span>
               </span>
-            ) : 'Select Assets'}
+            ) : `Assign ${selectedAssets.length} Asset${selectedAssets.length !== 1 ? 's' : ''}`}
           </button>
         </div>
       </div>

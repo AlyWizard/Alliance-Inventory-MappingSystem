@@ -396,7 +396,7 @@ const handleBackToEmployees = () => {
 
           <div className="p-2">
             {/* Assets */}
-            <div className="text-white flex items-center gap-2 p-2 hover:bg-[#1a3a4a] rounded">
+            <div className="text-white flex items-center gap-2 p-2 hover:bg-[#1a3a4a] rounded" onClick={() => window.location.href = '/assets'}>
               <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
                 <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
@@ -529,13 +529,12 @@ const handleBackToEmployees = () => {
                 <button 
                   className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-md transition-colors"
                   onClick={() => {
-                    if (selectedItems.length > 0) {
-                      setIsTransferModalOpen(true);
-                    } else {
-                      setError("Please select at least one asset to transfer");
+                    setIsTransferModalOpen(true);
+                    if (selectedItems.length === 0) {
+                      setError("No assets selected for transfer");
                     }
                   }}
-                  disabled={selectedItems.length === 0}
+                 // disabled={selectedItems.length === 0}
                 >
                   <FaExchangeAlt size={14} />
                   <span>Transfer</span>
